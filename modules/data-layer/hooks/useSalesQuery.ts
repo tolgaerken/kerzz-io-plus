@@ -160,9 +160,12 @@ export function useSalesQuery() {
 
   // Toplam satış istatistikleri
   const useSalesStats = (year: number, month?: number) => {
-    const salesQuery = month 
-      ? useSalesByMonth(year, month)
-      : useSalesByYear(year);
+    // Her iki hook'u da çağır, sadece birini kullan
+    const monthlyQuery = useSalesByMonth(year, month || 1);
+    const yearlyQuery = useSalesByYear(year);
+    
+    // Hangi query'yi kullanacağını belirle
+    const salesQuery = month ? monthlyQuery : yearlyQuery;
 
     const stats = useMemo(() => {
       if (!salesQuery.data) return null;
