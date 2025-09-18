@@ -1,0 +1,1 @@
+export { generateMaxiId } from './idGenerator';
