@@ -72,20 +72,16 @@ class FCMTokenService {
       console.log('🔔 FCM Token kaydediliyor:', { userId, token: token.substring(0, 20) + '...' });
       
       const deviceInfo = await this.getDeviceInfo();
+      const docId = 'fcm' + userId;
       
       // Önce aynı cihaz için mevcut token var mı kontrol et
-      const searchPayload = this.createPayload('get', { 
-        userId, 
-        deviceId: deviceInfo.deviceId,
-        isActive: true 
-      });
+      const searchPayload = this.createPayload('get', { id: docId });
 
       const existingTokens = await this.callMongoDB<FCMTokenModel[]>(searchPayload);
       const now = new Date();
       
       if (existingTokens && existingTokens.length > 0) {
         // Mevcut token'ı güncelle
-        const existingToken = existingTokens[0];
         
         const updatedToken: Partial<FCMTokenModel> = {
           fcmToken: token,
@@ -97,19 +93,20 @@ class FCMTokenService {
           updatedAt: now
         };
 
-        const updatePayload = this.createPayload('upsert', { id: existingToken.id }, updatedToken);
+        const updatePayload = this.createPayload('upsert', { id: docId }, updatedToken);
         await this.callMongoDB(updatePayload);
         
-        console.log('✅ Mevcut FCM token güncellendi:', existingToken.id);
+        console.log('✅ Mevcut FCM token güncellendi:', docId);
         
         return {
           success: true,
           message: 'Token güncellendi',
-          tokenId: existingToken.id
+          tokenId: docId
         };
       } else {
         // Yeni token kaydet
         const newToken: Partial<FCMTokenModel> = {
+          id: docId,
           fcmToken: token,
           userId,
           platform: Platform.OS as 'ios' | 'android',
@@ -123,15 +120,15 @@ class FCMTokenService {
           createdAt: now
         };
 
-        const insertPayload = this.createPayload('upsert', {}, newToken);
-        const result = await this.callMongoDB<FCMTokenModel>(insertPayload);
+        const insertPayload = this.createPayload('upsert', { id: docId }, newToken);
+        await this.callMongoDB<FCMTokenModel>(insertPayload);
         
-        console.log('✅ Yeni FCM token kaydedildi:', result.id);
+        console.log('✅ Yeni FCM token kaydedildi:', docId);
         
         return {
           success: true,
           message: 'Token kaydedildi',
-          tokenId: result.id || 'unknown'
+          tokenId: docId
         };
       }
     } catch (error) {
@@ -150,32 +147,27 @@ class FCMTokenService {
     try {
       console.log('🔔 FCM Token deaktif ediliyor:', { userId, token: token.substring(0, 20) + '...' });
       
+      const docId = 'fcm' + userId;
       // Token'ı bul
-      const searchPayload = this.createPayload('get', { 
-        userId, 
-        token,
-        isActive: true 
-      });
+      const searchPayload = this.createPayload('get', { id: docId });
 
       const existingTokens = await this.callMongoDB<FCMTokenModel[]>(searchPayload);
 
       if (existingTokens && existingTokens.length > 0) {
-        const existingToken = existingTokens[0];
-        
         // Token'ı deaktif et
-        const updatePayload = this.createPayload('upsert', { id: existingToken.id }, {
+        const updatePayload = this.createPayload('upsert', { id: docId }, {
           isActive: false,
           updatedAt: new Date()
         });
         
         await this.callMongoDB(updatePayload);
         
-        console.log('✅ FCM token deaktif edildi:', existingToken.id);
+        console.log('✅ FCM token deaktif edildi:', docId);
         
         return {
           success: true,
           message: 'Token deaktif edildi',
-          tokenId: existingToken.id
+          tokenId: docId
         };
       } else {
         console.log('⚠️ Deaktif edilecek token bulunamadı');
@@ -198,10 +190,8 @@ class FCMTokenService {
    */
   async getUserActiveTokens(userId: string): Promise<FCMTokenModel[]> {
     try {
-      const searchPayload = this.createPayload('get', { 
-        userId, 
-        isActive: true 
-      });
+      const docId = 'fcm' + userId;
+      const searchPayload = this.createPayload('get', { id: docId });
 
       const tokens = await this.callMongoDB<FCMTokenModel[]>(searchPayload);
       return tokens || [];
@@ -222,22 +212,21 @@ class FCMTokenService {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       // 30 günden eski token'ları bul
-      const searchPayload = this.createPayload('get', { 
-        userId,
-        lastUsedAt: { $lt: thirtyDaysAgo }
-      });
+      const docId = 'fcm' + userId;
+      const searchPayload = this.createPayload('get', { id: docId });
 
       const oldTokens = await this.callMongoDB<FCMTokenModel[]>(searchPayload);
 
       // Eski token'ları deaktif et
       if (oldTokens && oldTokens.length > 0) {
         for (const token of oldTokens) {
-          const updatePayload = this.createPayload('upsert', { id: token.id }, {
-            isActive: false,
-            updatedAt: new Date()
-          });
-          
-          await this.callMongoDB(updatePayload);
+          if (token.lastUsedAt && token.lastUsedAt < thirtyDaysAgo) {
+            const updatePayload = this.createPayload('upsert', { id: docId }, {
+              isActive: false,
+              updatedAt: new Date()
+            });
+            await this.callMongoDB(updatePayload);
+          }
         }
 
         console.log(`✅ ${oldTokens.length} eski FCM token deaktif edildi`);
