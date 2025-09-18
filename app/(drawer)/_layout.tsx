@@ -44,6 +44,15 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="sales"
+          options={{
+            title: 'Satışlar',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="chart.bar.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="profile"
           options={{
             title: 'Profil',

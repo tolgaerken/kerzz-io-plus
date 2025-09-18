@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
+import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import { MONGO_API, RN_CONFIG } from '../constants';
 import { BaseModel, MongoGetParams, MongoPayload } from '../types/mongo';
 import { generateMaxiId } from '../utils/idGenerator';
-import { MONGO_API } from '../constants';
 
 // External dependencies interfaces
 interface AuthStore {
@@ -102,6 +102,10 @@ export function useBaseQuery<T extends BaseModel>(
 
   // API Functions
   const fetchList = useCallback(async (params: Partial<MongoGetParams> = {}): Promise<T[]> => {
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log(`🔍 useBaseQuery.fetchList çağrıldı: ${database}.${collection}`, { params });
+    }
+
     const fetchParams: MongoGetParams = {
       col: collection,
       db: database,
@@ -111,20 +115,55 @@ export function useBaseQuery<T extends BaseModel>(
       ...params,
     };
 
-    const payload = buildMongoPayload('get', fetchParams);
-    // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
-    return await httpClient.post<T[]>(MONGO_API.BASE_URL, payload);
-  }, [database, collection, buildMongoPayload]);
+    try {
+      const payload = buildMongoPayload('get', fetchParams);
+      // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
+      const result = await httpClient.post<T[]>(MONGO_API.BASE_URL, payload);
+      
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`✅ useBaseQuery.fetchList başarılı: ${database}.${collection}, ${result.length} item`);
+      }
+      
+      return result;
+    } catch (error) {
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.error(`❌ useBaseQuery.fetchList hata: ${database}.${collection}`, error);
+      }
+      throw error;
+    }
+  }, [database, collection, buildMongoPayload, httpClient]);
 
   const fetchOne = useCallback(async (id: string): Promise<T | null> => {
     if (!id) return null;
     
-    const items = await fetchList({ filter: { id } });
-    return items.length > 0 ? items[0] : null;
-  }, [fetchList]);
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log(`🔍 useBaseQuery.fetchOne çağrıldı: ${database}.${collection}`, { id });
+    }
+    
+    try {
+      const items = await fetchList({ filter: { id } });
+      const result = items.length > 0 ? items[0] : null;
+      
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`✅ useBaseQuery.fetchOne ${result ? 'bulundu' : 'bulunamadı'}: ${database}.${collection}`, { id });
+      }
+      
+      return result;
+    } catch (error) {
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.error(`❌ useBaseQuery.fetchOne hata: ${database}.${collection}`, { id, error });
+      }
+      throw error;
+    }
+  }, [fetchList, database, collection]);
 
   const createItem = useCallback(async (data: Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'creatorId' | 'updaterId'>): Promise<T> => {
     const targetId = generateMaxiId();
+    
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log(`🔍 useBaseQuery.createItem çağrıldı: ${database}.${collection}`, { targetId, data });
+    }
+    
     const itemData = {
       ...data,
       id: targetId,
@@ -133,28 +172,75 @@ export function useBaseQuery<T extends BaseModel>(
       creatorId: userInfo?.id,
     } as any;
 
-    const payload = createPayload('upsert', targetId, itemData);
-    // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
-    return await httpClient.post<T>(MONGO_API.BASE_URL, payload);
-  }, [createPayload, userInfo]);
+    try {
+      const payload = createPayload('upsert', targetId, itemData);
+      // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
+      const result = await httpClient.post<T>(MONGO_API.BASE_URL, payload);
+      
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`✅ useBaseQuery.createItem başarılı: ${database}.${collection}`, { targetId });
+      }
+      
+      return result;
+    } catch (error) {
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.error(`❌ useBaseQuery.createItem hata: ${database}.${collection}`, { targetId, error });
+      }
+      throw error;
+    }
+  }, [createPayload, userInfo, database, collection, httpClient]);
 
   const updateItem = useCallback(async (id: string, data: Partial<T>): Promise<T> => {
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log(`🔍 useBaseQuery.updateItem çağrıldı: ${database}.${collection}`, { id, data });
+    }
+    
     const updateData = {
       ...data,
       updatedAt: new Date(),
       updaterId: userInfo?.id,
     };
 
-    const payload = createPayload('upsert', id, updateData);
-    // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
-    return await httpClient.post<T>(MONGO_API.BASE_URL, payload);
-  }, [createPayload, userInfo]);
+    try {
+      const payload = createPayload('upsert', id, updateData);
+      // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
+      const result = await httpClient.post<T>(MONGO_API.BASE_URL, payload);
+      
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`✅ useBaseQuery.updateItem başarılı: ${database}.${collection}`, { id });
+      }
+      
+      return result;
+    } catch (error) {
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.error(`❌ useBaseQuery.updateItem hata: ${database}.${collection}`, { id, error });
+      }
+      throw error;
+    }
+  }, [createPayload, userInfo, database, collection, httpClient]);
 
   const deleteItem = useCallback(async (id: string): Promise<any> => {
-    const payload = createPayload('delete', id);
-    // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
-    return await httpClient.post(MONGO_API.BASE_URL, payload);
-  }, [createPayload]);
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log(`🔍 useBaseQuery.deleteItem çağrıldı: ${database}.${collection}`, { id });
+    }
+    
+    try {
+      const payload = createPayload('delete', id);
+      // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
+      const result = await httpClient.post(MONGO_API.BASE_URL, payload);
+      
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`✅ useBaseQuery.deleteItem başarılı: ${database}.${collection}`, { id });
+      }
+      
+      return result;
+    } catch (error) {
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.error(`❌ useBaseQuery.deleteItem hata: ${database}.${collection}`, { id, error });
+      }
+      throw error;
+    }
+  }, [createPayload, database, collection, httpClient]);
 
   // Query invalidation helpers
   const invalidateList = useCallback(() => {
@@ -165,19 +251,29 @@ export function useBaseQuery<T extends BaseModel>(
     queryClient.invalidateQueries({ queryKey: [...baseQueryKey, id] });
   }, [queryClient, baseQueryKey]);
 
-  // React Query Hooks
-  const useList = useCallback((
+  // React Query Hook Factories
+  const useList = (
     params: Partial<MongoGetParams> = {},
     options: Omit<UseQueryOptions<T[], Error>, 'queryKey' | 'queryFn'> = {}
   ) => {
     return useQuery({
       queryKey: [...baseQueryKey, 'list', params],
       queryFn: () => fetchList(params),
+      // React Native optimizasyonları
+      staleTime: 5 * 60 * 1000, // 5 dakika
+      gcTime: 10 * 60 * 1000, // 10 dakika (eski adı: cacheTime)
+      retry: (failureCount, error) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.log(`🔄 useBaseQuery.useList retry: ${failureCount}`, error);
+        }
+        return failureCount < 3;
+      },
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
       ...options,
     });
-  }, [baseQueryKey, fetchList]);
+  };
 
-  const useOne = useCallback((
+  const useOne = (
     id: string,
     options: Omit<UseQueryOptions<T | null, Error>, 'queryKey' | 'queryFn'> = {}
   ) => {
@@ -185,32 +281,56 @@ export function useBaseQuery<T extends BaseModel>(
       queryKey: [...baseQueryKey, id],
       queryFn: () => fetchOne(id),
       enabled: !!id,
+      // React Native optimizasyonları
+      staleTime: 5 * 60 * 1000, // 5 dakika
+      gcTime: 10 * 60 * 1000, // 10 dakika (eski adı: cacheTime)
+      retry: (failureCount, error) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.log(`🔄 useBaseQuery.useOne retry: ${failureCount}`, { id, error });
+        }
+        return failureCount < 3;
+      },
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
       ...options,
     });
-  }, [baseQueryKey, fetchOne]);
+  };
 
-  const useCreate = useCallback((
+  const useCreate = (
     options: UseMutationOptions<T, Error, Omit<T, 'id' | 'createdAt' | 'updatedAt' | 'creatorId' | 'updaterId'>> = {}
   ) => {
     return useMutation({
       mutationFn: createItem,
       onSuccess: (newItem) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.log(`✅ useBaseQuery.useCreate başarılı: ${database}.${collection}`, { newItem });
+        }
         // Optimistic update
         queryClient.setQueryData(baseQueryKey, (old: T[] | undefined) => 
           old ? [...old, newItem] : [newItem]
         );
         invalidateList();
       },
+      onError: (error) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.error(`❌ useBaseQuery.useCreate hata: ${database}.${collection}`, error);
+        }
+      },
+      // React Native optimizasyonları
+      retry: 2,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
       ...options,
     });
-  }, [createItem, queryClient, baseQueryKey, invalidateList]);
+  };
 
-  const useUpdate = useCallback((
+  const useUpdate = (
     options: UseMutationOptions<T, Error, { id: string; data: Partial<T> }> = {}
   ) => {
     return useMutation({
       mutationFn: ({ id, data }) => updateItem(id, data),
       onSuccess: (updatedItem, { id }) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.log(`✅ useBaseQuery.useUpdate başarılı: ${database}.${collection}`, { id, updatedItem });
+        }
         // Optimistic update
         queryClient.setQueryData([...baseQueryKey, id], updatedItem);
         queryClient.setQueryData(baseQueryKey, (old: T[] | undefined) =>
@@ -221,16 +341,27 @@ export function useBaseQuery<T extends BaseModel>(
         invalidateList();
         invalidateOne(id);
       },
+      onError: (error, { id }) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.error(`❌ useBaseQuery.useUpdate hata: ${database}.${collection}`, { id, error });
+        }
+      },
+      // React Native optimizasyonları
+      retry: 2,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
       ...options,
     });
-  }, [updateItem, queryClient, baseQueryKey, invalidateList, invalidateOne]);
+  };
 
-  const useDelete = useCallback((
+  const useDelete = (
     options: UseMutationOptions<any, Error, string> = {}
   ) => {
     return useMutation({
       mutationFn: deleteItem,
       onSuccess: (_, id) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.log(`✅ useBaseQuery.useDelete başarılı: ${database}.${collection}`, { id });
+        }
         // Optimistic update
         queryClient.removeQueries({ queryKey: [...baseQueryKey, id] });
         queryClient.setQueryData(baseQueryKey, (old: T[] | undefined) =>
@@ -238,9 +369,17 @@ export function useBaseQuery<T extends BaseModel>(
         );
         invalidateList();
       },
+      onError: (error, id) => {
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.error(`❌ useBaseQuery.useDelete hata: ${database}.${collection}`, { id, error });
+        }
+      },
+      // React Native optimizasyonları
+      retry: 2,
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
       ...options,
     });
-  }, [deleteItem, queryClient, baseQueryKey, invalidateList]);
+  };
 
   return {
     useList,
