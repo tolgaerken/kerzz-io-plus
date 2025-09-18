@@ -1,5 +1,6 @@
+import { Platform } from 'react-native';
 import { io, Socket } from 'socket.io-client';
-import { SOCKET_CONFIG } from '../constants';
+import { RN_CONFIG, SOCKET_CONFIG } from '../constants';
 import { SocketMongo } from '../types/mongo';
 
 /**
@@ -85,15 +86,24 @@ export class SocketService {
       return;
     }
 
-    console.log('🔌 Socket service başlatılıyor...');
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log(`🔌 Socket service başlatılıyor... (${Platform.OS})`);
+    }
     
-    this.socket = io(SOCKET_CONFIG.URL, {
+    // React Native için optimize edilmiş socket konfigürasyonu
+    const socketOptions = {
       reconnection: SOCKET_CONFIG.RECONNECTION.ENABLED,
       reconnectionDelay: SOCKET_CONFIG.RECONNECTION.DELAY,
       reconnectionDelayMax: SOCKET_CONFIG.RECONNECTION.DELAY_MAX,
       reconnectionAttempts: SOCKET_CONFIG.RECONNECTION.ATTEMPTS,
       autoConnect: false,
-    });
+      forceNew: RN_CONFIG.SOCKET_OPTIONS.forceNew,
+      transports: [...RN_CONFIG.SOCKET_OPTIONS.transports], // Mutable array oluştur
+      upgrade: RN_CONFIG.SOCKET_OPTIONS.upgrade,
+      rememberUpgrade: RN_CONFIG.SOCKET_OPTIONS.rememberUpgrade,
+    };
+
+    this.socket = io(SOCKET_CONFIG.URL, socketOptions);
 
     this.setupSocketListeners();
     this.setupHeartbeat();
@@ -196,7 +206,9 @@ export class SocketService {
    * Socket bağlantısını kapat
    */
   public disconnect(): void {
-    console.log('🔌 Socket bağlantısı kapatılıyor...');
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log('🔌 Socket bağlantısı kapatılıyor...');
+    }
     
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
@@ -223,7 +235,9 @@ export class SocketService {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket bağlandı');
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log('✅ Socket bağlandı');
+      }
       this.isAuthenticated = false;
       this.updateSocketState({
         isConnected: true,
@@ -235,7 +249,9 @@ export class SocketService {
     });
 
     this.socket.on('disconnect', () => {
-      console.log('❌ Socket bağlantısı kesildi');
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log('❌ Socket bağlantısı kesildi');
+      }
       this.isAuthenticated = false;
       this.updateSocketState({
         isConnected: false,
@@ -245,14 +261,18 @@ export class SocketService {
     });
 
     this.socket.on('reconnecting', () => {
-      console.log('🔄 Socket yeniden bağlanıyor...');
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log('🔄 Socket yeniden bağlanıyor...');
+      }
       this.updateSocketState({
         connectionStatus: 'reconnecting'
       });
     });
 
     this.socket.on('wellcome', (data: any) => {
-      console.log('👋 Hoşgeldin mesajı alındı, login gönderiliyor', data);
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log('👋 Hoşgeldin mesajı alındı, login gönderiliyor', data);
+      }
       this.socket?.emit('login', JSON.stringify({
         alias: SOCKET_CONFIG.AUTH.ALIAS,
         secretKey: SOCKET_CONFIG.AUTH.SECRET_KEY,
@@ -261,7 +281,9 @@ export class SocketService {
     });
 
     this.socket.on('login', () => {
-      console.log('🔐 Login başarılı');
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log('🔐 Login başarılı');
+      }
       this.isAuthenticated = true;
       this.updateSocketState({
         isAuthenticated: true

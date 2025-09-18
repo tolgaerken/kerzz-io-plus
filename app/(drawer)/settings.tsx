@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -6,13 +6,96 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthStore } from '@modules/auth';
+import { NotificationPermissionModal, useNotifications } from '@modules/notifications';
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const { logout, user } = useAuthStore();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const { 
+    hasPermission, 
+    settings, 
+    updateSettings, 
+    requestPermission,
+    sendNotification,
+    unreadCount 
+  } = useNotifications();
+  
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [darkModeEnabled, setDarkModeEnabled] = useState(colorScheme === 'dark');
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+
+  // Notification ayarlarını yükle
+  useEffect(() => {
+    if (settings) {
+      // Settings yüklendikten sonra state'leri güncelle
+    }
+  }, [settings]);
+
+  const handleNotificationToggle = async (value: boolean) => {
+    if (value && !hasPermission) {
+      // İzin yoksa modal göster
+      setShowPermissionModal(true);
+    } else if (value && hasPermission) {
+      // İzin varsa bildirimleri etkinleştir
+      await updateSettings({ 
+        ...settings,
+        categories: {
+          ...settings?.categories,
+          messages: true,
+          updates: true,
+        }
+      });
+    } else {
+      // Bildirimleri devre dışı bırak
+      await updateSettings({ 
+        ...settings,
+        categories: {
+          ...settings?.categories,
+          messages: false,
+          updates: false,
+          promotions: false,
+          reminders: false,
+        }
+      });
+    }
+  };
+
+  const handleCategoryToggle = async (category: string, value: boolean) => {
+    await updateSettings({
+      ...settings,
+      categories: {
+        ...settings?.categories,
+        [category]: value,
+      },
+    });
+  };
+
+  const handleTestNotification = async () => {
+    if (!hasPermission) {
+      Alert.alert('Hata', 'Bildirim izni gerekli');
+      return;
+    }
+
+    try {
+      await sendNotification(
+        'Test Bildirimi',
+        'Bu bir test bildirimidir. Sistem düzgün çalışıyor! 🎉',
+        { category: 'system', actionUrl: '/settings' }
+      );
+      
+      Alert.alert('Başarılı', 'Test bildirimi gönderildi!');
+    } catch (error) {
+      Alert.alert('Hata', 'Bildirim gönderilemedi');
+    }
+  };
+
+  // Notification kategorilerinin aktif olup olmadığını kontrol et
+  const isNotificationsEnabled = hasPermission && (
+    settings?.categories?.messages || 
+    settings?.categories?.updates || 
+    settings?.categories?.promotions || 
+    settings?.categories?.reminders
+  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -56,18 +139,83 @@ export default function SettingsScreen() {
         </ThemedView>
 
         <ThemedView style={styles.section}>
-          <ThemedText type="subtitle">Genel</ThemedText>
+          <ThemedText type="subtitle">Bildirimler</ThemedText>
           
           <ThemedView style={styles.settingItem}>
             <ThemedView style={styles.settingLeft}>
               <IconSymbol name="bell.fill" size={20} color={colorScheme === 'dark' ? '#fff' : '#000'} />
-              <ThemedText style={styles.settingText}>Bildirimler</ThemedText>
+              <ThemedView>
+                <ThemedText style={styles.settingText}>Bildirimler</ThemedText>
+                <ThemedText style={styles.settingSubtext}>
+                  {hasPermission ? 'Etkin' : 'İzin gerekli'} 
+                  {unreadCount > 0 && ` • ${unreadCount} okunmamış`}
+                </ThemedText>
+              </ThemedView>
             </ThemedView>
             <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              value={isNotificationsEnabled}
+              onValueChange={handleNotificationToggle}
             />
           </ThemedView>
+
+          {hasPermission && (
+            <>
+              <ThemedView style={styles.settingItem}>
+                <ThemedView style={styles.settingLeft}>
+                  <IconSymbol name="message.fill" size={20} color={colorScheme === 'dark' ? '#fff' : '#000'} />
+                  <ThemedText style={styles.settingText}>Mesajlar</ThemedText>
+                </ThemedView>
+                <Switch
+                  value={settings?.categories?.messages || false}
+                  onValueChange={(value) => handleCategoryToggle('messages', value)}
+                />
+              </ThemedView>
+
+              <ThemedView style={styles.settingItem}>
+                <ThemedView style={styles.settingLeft}>
+                  <IconSymbol name="arrow.up.circle.fill" size={20} color={colorScheme === 'dark' ? '#fff' : '#000'} />
+                  <ThemedText style={styles.settingText}>Güncellemeler</ThemedText>
+                </ThemedView>
+                <Switch
+                  value={settings?.categories?.updates || false}
+                  onValueChange={(value) => handleCategoryToggle('updates', value)}
+                />
+              </ThemedView>
+
+              <ThemedView style={styles.settingItem}>
+                <ThemedView style={styles.settingLeft}>
+                  <IconSymbol name="tag.fill" size={20} color={colorScheme === 'dark' ? '#fff' : '#000'} />
+                  <ThemedText style={styles.settingText}>Promosyonlar</ThemedText>
+                </ThemedView>
+                <Switch
+                  value={settings?.categories?.promotions || false}
+                  onValueChange={(value) => handleCategoryToggle('promotions', value)}
+                />
+              </ThemedView>
+
+              <ThemedView style={styles.settingItem}>
+                <ThemedView style={styles.settingLeft}>
+                  <IconSymbol name="clock.fill" size={20} color={colorScheme === 'dark' ? '#fff' : '#000'} />
+                  <ThemedText style={styles.settingText}>Hatırlatmalar</ThemedText>
+                </ThemedView>
+                <Switch
+                  value={settings?.categories?.reminders || false}
+                  onValueChange={(value) => handleCategoryToggle('reminders', value)}
+                />
+              </ThemedView>
+
+              <TouchableOpacity style={styles.settingItem} onPress={handleTestNotification}>
+                <ThemedView style={styles.settingLeft}>
+                  <IconSymbol name="paperplane.fill" size={20} color="#3B82F6" />
+                  <ThemedText style={[styles.settingText, { color: '#3B82F6' }]}>Test Bildirimi Gönder</ThemedText>
+                </ThemedView>
+              </TouchableOpacity>
+            </>
+          )}
+        </ThemedView>
+
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle">Genel</ThemedText>
 
           <ThemedView style={styles.settingItem}>
             <ThemedView style={styles.settingLeft}>
@@ -139,6 +287,21 @@ export default function SettingsScreen() {
           </ThemedView>
         </ThemedView>
       </ThemedView>
+
+      <NotificationPermissionModal
+        visible={showPermissionModal}
+        onClose={() => setShowPermissionModal(false)}
+        onPermissionGranted={() => {
+          setShowPermissionModal(false);
+          // İzin verildikten sonra bildirimleri etkinleştir
+          setTimeout(() => {
+            handleNotificationToggle(true);
+          }, 500);
+        }}
+        onPermissionDenied={() => {
+          setShowPermissionModal(false);
+        }}
+      />
     </ScrollView>
   );
 }
@@ -184,6 +347,12 @@ const styles = StyleSheet.create({
   settingText: {
     marginLeft: 12,
     fontSize: 16,
+  },
+  settingSubtext: {
+    marginLeft: 12,
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 2,
   },
   infoItem: {
     flexDirection: 'row',

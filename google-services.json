@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "410404917668",
+    "project_id": "kerzz-io",
+    "storage_bucket": "kerzz-io.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:410404917668:android:8de6497705198a8e253131",
+        "android_client_info": {
+          "package_name": "com.kerzz.kerzz-io"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBPvksSwsTZ7oCLO_cXctbXUF2zwktSGU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

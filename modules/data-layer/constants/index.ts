@@ -1,15 +1,27 @@
+import Constants from 'expo-constants';
+
+// React Native Environment Helper
+const getEnvVar = (key: string, defaultValue?: string): string => {
+  // Expo Constants'tan environment variable'ları al
+  const expoConfig = Constants.expoConfig;
+  const extra = expoConfig?.extra || {};
+  
+  // Önce expo extra'dan, sonra process.env'den, son olarak default'tan al
+  return extra[key] || process.env[key] || defaultValue || '';
+};
+
 // MongoDB API Configuration
 export const MONGO_API = {
-  BASE_URL: import.meta.env.REACT_APP_DB_URL || 'https://public.kerzz.com:50502/api/database/dataAction',
+  BASE_URL: getEnvVar('EXPO_PUBLIC_DB_URL', 'https://public.kerzz.com:50502/api/database/dataAction'),
   TIMEOUT: 30000,
 } as const
 
 // Socket Configuration
 export const SOCKET_CONFIG = {
-  URL: 'https://public.kerzz.com:50503',
+  URL: getEnvVar('EXPO_PUBLIC_SOCKET_URL', 'https://public.kerzz.com:50503'),
   AUTH: {
-    ALIAS: 'ali-yilmaz',
-    SECRET_KEY: '14531453'
+    ALIAS: getEnvVar('EXPO_PUBLIC_SOCKET_ALIAS', 'ali-yilmaz'),
+    SECRET_KEY: getEnvVar('EXPO_PUBLIC_SOCKET_SECRET', '14531453')
   },
   RECONNECTION: {
     ENABLED: true,
@@ -35,8 +47,32 @@ export const API_HEADERS = {
 
 // Environment configurations
 export const ENV = {
-  DEVELOPMENT: import.meta.env.DEV,
-  PRODUCTION: import.meta.env.PROD,
-  API_TIMEOUT: Number(import.meta.env.VITE_API_TIMEOUT) || 10000,
-  API_TIMEOUT_LONG: Number(import.meta.env.VITE_API_TIMEOUT_LONG) || 120000
+  DEVELOPMENT: __DEV__, // React Native'de __DEV__ kullanılır
+  PRODUCTION: !__DEV__,
+  API_TIMEOUT: Number(getEnvVar('EXPO_PUBLIC_API_TIMEOUT', '10000')),
+  API_TIMEOUT_LONG: Number(getEnvVar('EXPO_PUBLIC_API_TIMEOUT_LONG', '120000'))
+} as const
+
+// React Native specific configurations
+export const RN_CONFIG = {
+  // Network timeout for React Native
+  NETWORK_TIMEOUT: 30000,
+  
+  // Logging configuration
+  ENABLE_LOGS: __DEV__,
+  
+  // AsyncStorage keys
+  STORAGE_KEYS: {
+    AUTH_TOKEN: '@kerzz/auth_token',
+    USER_INFO: '@kerzz/user_info',
+    SOCKET_STATE: '@kerzz/socket_state'
+  },
+  
+  // React Native specific socket options
+  SOCKET_OPTIONS: {
+    forceNew: true,
+    transports: ['websocket' as const], // React Native'de websocket tercih edilir
+    upgrade: false,
+    rememberUpgrade: false
+  }
 } as const

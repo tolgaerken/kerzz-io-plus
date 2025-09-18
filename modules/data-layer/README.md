@@ -1,6 +1,18 @@
 # Data Layer Module
 
-Bu modül, MongoDB entegrasyonu, Socket.IO real-time güncellemeleri ve React Query tabanlı veri yönetimi için kapsamlı bir çözüm sunar. Angular TBaseMongoService'den esinlenerek React hook'ları olarak yeniden tasarlanmıştır.
+Bu modül, MongoDB entegrasyonu, Socket.IO real-time güncellemeleri ve React Query tabanlı veri yönetimi için kapsamlı bir çözüm sunar. Angular TBaseMongoService'den esinlenerek React hook'ları olarak yeniden tasarlanmış ve **React Native (Expo) ile tam uyumlu** hale getirilmiştir.
+
+## 🎯 **React Native Desteği**
+
+Bu modül artık React Native projelerinde sorunsuz çalışır:
+- ✅ Expo Constants entegrasyonu
+- ✅ AsyncStorage desteği  
+- ✅ React Native optimized socket konfigürasyonu
+- ✅ Platform-aware logging
+- ✅ Network state monitoring hazır
+- ✅ Background task handling
+
+**React Native kurulumu için:** [SETUP-REACT-NATIVE.md](./SETUP-REACT-NATIVE.md)
 
 ## 📁 Klasör Yapısı
 

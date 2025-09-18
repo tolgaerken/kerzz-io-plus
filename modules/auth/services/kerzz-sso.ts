@@ -378,24 +378,12 @@ export const startTokenRefreshInterval = (): number => {
  */
 const safeGetLocalStorage = async (key: string): Promise<string | null> => {
   try {
-    // Safari'de localStorage erişimi test et
-    if (typeof Storage === 'undefined') {
-      console.warn('⚠️ localStorage desteklenmiyor')
-      return null
-    }
-    
-    // Storage'dan değeri al
+    // React Native'de AsyncStorage kullanıyoruz, Storage kontrolü gereksiz
     const value = await storage.getItem(key)
     return value
   } catch (error) {
-    console.warn('⚠️ localStorage erişim hatası:', error)
-    // Safari'de localStorage erişimi başarısızsa sessionStorage'ı dene
-    try {
-      return await storage.getItem(key)
-    } catch (sessionError) {
-      console.warn('⚠️ sessionStorage erişim hatası:', sessionError)
-      return null
-    }
+    console.warn('⚠️ AsyncStorage erişim hatası:', error)
+    return null
   }
 }
 
@@ -407,15 +395,8 @@ const safeSetLocalStorage = async (key: string, value: string): Promise<boolean>
     await storage.setItem(key, value)
     return true
   } catch (error) {
-    console.warn('⚠️ localStorage yazma hatası:', error)
-    // Safari'de localStorage yazma başarısızsa sessionStorage'ı dene
-    try {
-      await storage.setItem(key, value)
-      return true
-    } catch (sessionError) {
-      console.warn('⚠️ sessionStorage yazma hatası:', sessionError)
-      return false
-    }
+    console.warn('⚠️ AsyncStorage yazma hatası:', error)
+    return false
   }
 }
 
@@ -432,7 +413,7 @@ export const autoLoginFromStorage = async (): Promise<KerzzAutoLoginResponse> =>
     
     if (!storedUserInfo) {
       console.log('❌ localStorage\'da TUserInfo bulunamadı')
-      throw new Error('Kullanıcı bilgisi bulunamadı')
+      return { success: false, message: 'Kullanıcı bilgisi bulunamadı' }
     }
     
     let userInfo: TUserInfo
@@ -440,12 +421,12 @@ export const autoLoginFromStorage = async (): Promise<KerzzAutoLoginResponse> =>
       userInfo = JSON.parse(storedUserInfo)
     } catch (parseError) {
       console.error('❌ TUserInfo parse hatası:', parseError)
-      throw new Error('Kullanıcı bilgisi bozuk')
+      return { success: false, message: 'Kullanıcı bilgisi bozuk' }
     }
     
     if (!userInfo.accessToken) {
       console.log('❌ TUserInfo\'da accessToken bulunamadı')
-      throw new Error('Access token bulunamadı')
+      return { success: false, message: 'Access token bulunamadı' }
     }
     
     console.log('🚀 TUserInfo bulundu, auto login API çağrısı yapılıyor...', {
@@ -507,7 +488,7 @@ export const autoLoginFromStorage = async (): Promise<KerzzAutoLoginResponse> =>
       }
     } else {
       // API'den başarısız response geldi
-      throw new Error('Auto login başarısız - UserInfo alınamadı')
+      return { success: false, message: 'Auto login başarısız - UserInfo alınamadı' }
     }
   } catch (error) {
     console.error('❌ localStorage auto login hatası:', error)
@@ -523,10 +504,10 @@ export const autoLoginFromStorage = async (): Promise<KerzzAutoLoginResponse> =>
     
     if (isAxiosError(error)) {
       const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Auto login başarısız'
-      throw new Error(errorMessage)
+      return { success: false, message: errorMessage }
     }
     
-    throw new Error(error instanceof Error ? error.message : 'Auto login başarısız')
+    return { success: false, message: error instanceof Error ? error.message : 'Auto login başarısız' }
   }
 }
 

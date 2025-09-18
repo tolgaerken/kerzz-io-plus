@@ -1,29 +1,34 @@
-import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  AuthorizationStatus,
+  deleteToken,
+  FirebaseMessagingTypes,
+  getInitialNotification,
+  getMessaging,
+  getToken,
+  onMessage,
+  onTokenRefresh,
+  requestPermission,
+  setBackgroundMessageHandler,
+  subscribeToTopic,
+  unsubscribeFromTopic
+} from '@react-native-firebase/messaging';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  NotificationData, 
-  FCMToken, 
-  NotificationPermission, 
-  NotificationSettings,
-  NotificationResponse 
+import { isFirebaseInitialized } from '../../../config/firebase';
+import {
+  FCMToken,
+  NotificationPermission,
+  NotificationSettings
 } from '../types';
-
-// Notification davranışını yapılandır
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
 
 class NotificationService {
   private static instance: NotificationService;
   private currentToken: string | null = null;
-  private notificationListener: any = null;
-  private responseListener: any = null;
+  private messageListener: (() => void) | null = null;
+  private tokenRefreshListener: (() => void) | null = null;
+  private backgroundMessageHandler: (() => void) | null = null;
+  private messaging = getMessaging();
 
   private constructor() {}
 
@@ -35,90 +40,66 @@ class NotificationService {
   }
 
   /**
-   * Notification izinlerini kontrol et ve iste
+   * FCM notification izinlerini kontrol et ve iste
    */
   async requestPermissions(): Promise<NotificationPermission> {
     try {
-      if (!Device.isDevice) {
-        console.warn('Push notifications sadece fiziksel cihazlarda çalışır');
+      // Firebase App'in başlatılıp başlatılmadığını kontrol et
+      if (!isFirebaseInitialized()) {
+        console.error('❌ Firebase App başlatılmamış');
         return { status: 'denied', canAskAgain: false };
       }
 
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
+      // FCM authorization durumunu kontrol et
+      const authStatus = await requestPermission(this.messaging);
+      
+      const enabled =
+        authStatus === AuthorizationStatus.AUTHORIZED ||
+        authStatus === AuthorizationStatus.PROVISIONAL;
 
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-
-      if (finalStatus !== 'granted') {
+      if (!enabled) {
         return { 
           status: 'denied', 
-          canAskAgain: existingStatus === 'undetermined' 
+          canAskAgain: authStatus === AuthorizationStatus.NOT_DETERMINED 
         };
       }
 
-      // Android için notification channel oluştur
-      if (Platform.OS === 'android') {
-        await this.createNotificationChannels();
-      }
+      // iOS için APNs token kaydı: firebase.json auto-register true olduğundan manuel kayıt gereksiz
+      // Gereksiz uyarıyı önlemek için bu blok kaldırıldı
 
       return { status: 'granted', canAskAgain: true };
     } catch (error) {
-      console.error('Permission request hatası:', error);
+      console.error('FCM permission request hatası:', error);
       return { status: 'denied', canAskAgain: false };
     }
   }
 
-  /**
-   * Android için notification channel'ları oluştur
-   */
-  private async createNotificationChannels(): Promise<void> {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Varsayılan',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-      sound: 'default',
-    });
-
-    await Notifications.setNotificationChannelAsync('messages', {
-      name: 'Mesajlar',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      sound: 'default',
-    });
-
-    await Notifications.setNotificationChannelAsync('updates', {
-      name: 'Güncellemeler',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 250],
-      sound: 'default',
-    });
-  }
 
   /**
    * FCM token al
    */
   async getToken(): Promise<string | null> {
     try {
-      const permission = await this.requestPermissions();
-      if (permission.status !== 'granted') {
-        console.warn('Notification izni verilmedi');
+      // Firebase App'in başlatılıp başlatılmadığını kontrol et
+      if (!isFirebaseInitialized()) {
+        console.error('❌ Firebase App başlatılmamış');
         return null;
       }
 
-      const token = await Notifications.getExpoPushTokenAsync({
-        projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
-      });
+      const permission = await this.requestPermissions();
+      if (permission.status !== 'granted') {
+        console.warn('FCM notification izni verilmedi');
+        return null;
+      }
 
-      this.currentToken = token.data;
-      await this.saveTokenToStorage(token.data);
+      const token = await getToken(this.messaging);
+
+      this.currentToken = token;
+      await this.saveTokenToStorage(token);
       
-      return token.data;
+      return token;
     } catch (error) {
-      console.error('Token alma hatası:', error);
+      console.error('FCM token alma hatası:', error);
       return null;
     }
   }
@@ -159,98 +140,134 @@ class NotificationService {
   }
 
   /**
-   * Notification listener'ları başlat
+   * FCM message listener'larını başlat
    */
   startListening(): void {
-    // Foreground notification listener
-    this.notificationListener = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        console.log('Notification alındı:', notification);
-        this.handleForegroundNotification(notification);
-      }
-    );
-
-    // Notification response listener (kullanıcı notification'a tıkladığında)
-    this.responseListener = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        console.log('Notification response:', response);
-        this.handleNotificationResponse(response);
-      }
-    );
-  }
-
-  /**
-   * Listener'ları durdur
-   */
-  stopListening(): void {
-    if (this.notificationListener) {
-      Notifications.removeNotificationSubscription(this.notificationListener);
-      this.notificationListener = null;
+    // Firebase App'in başlatılıp başlatılmadığını kontrol et
+    if (!isFirebaseInitialized()) {
+      console.error('❌ Firebase App başlatılmamış, listener başlatılamıyor');
+      return;
     }
 
-    if (this.responseListener) {
-      Notifications.removeNotificationSubscription(this.responseListener);
-      this.responseListener = null;
-    }
-  }
-
-  /**
-   * Foreground notification'ı işle
-   */
-  private handleForegroundNotification(notification: Notifications.Notification): void {
-    // Burada custom in-app notification gösterebiliriz
-    // Veya notification store'u güncelleyebiliriz
-    console.log('Foreground notification işlendi:', notification.request.content.title);
-  }
-
-  /**
-   * Notification response'ını işle
-   */
-  private handleNotificationResponse(response: Notifications.NotificationResponse): void {
-    const { notification, actionIdentifier } = response;
-    
-    // Navigation veya deep linking işlemleri burada yapılabilir
-    console.log('Notification tıklandı:', {
-      title: notification.request.content.title,
-      action: actionIdentifier,
-      data: notification.request.content.data,
+    // Foreground message listener
+    this.messageListener = onMessage(this.messaging, async (remoteMessage) => {
+      console.log('FCM message alındı (foreground):', remoteMessage);
+      this.handleForegroundMessage(remoteMessage);
     });
 
-    // Deep linking için data'daki URL'i kullan
-    if (notification.request.content.data?.actionUrl) {
-      // Router.push(notification.request.content.data.actionUrl);
+    // Token refresh listener
+    this.tokenRefreshListener = onTokenRefresh(this.messaging, async (token) => {
+      console.log('FCM token yenilendi:', token);
+      await this.handleTokenRefresh(token);
+    });
+
+    // Background message handler
+    setBackgroundMessageHandler(this.messaging, async (remoteMessage) => {
+      console.log('FCM message alındı (background):', remoteMessage);
+      this.handleBackgroundMessage(remoteMessage);
+    });
+  }
+
+  /**
+   * FCM listener'larını durdur
+   */
+  stopListening(): void {
+    if (this.messageListener) {
+      this.messageListener();
+      this.messageListener = null;
+    }
+
+    if (this.tokenRefreshListener) {
+      this.tokenRefreshListener();
+      this.tokenRefreshListener = null;
     }
   }
 
   /**
-   * Local notification gönder
+   * Foreground FCM message'ını işle
    */
-  async sendLocalNotification(
+  private handleForegroundMessage(remoteMessage: FirebaseMessagingTypes.RemoteMessage): void {
+    // Burada custom in-app notification gösterebiliriz
+    // Veya notification store'u güncelleyebiliriz
+    console.log('Foreground FCM message işlendi:', remoteMessage.notification?.title);
+    
+    // Local notification olarak göster
+    if (remoteMessage.notification) {
+      this.showLocalNotification(
+        remoteMessage.notification.title || 'Bildirim',
+        remoteMessage.notification.body || '',
+        remoteMessage.data
+      );
+    }
+  }
+
+  /**
+   * Background FCM message'ını işle
+   */
+  private handleBackgroundMessage(remoteMessage: FirebaseMessagingTypes.RemoteMessage): void {
+    console.log('Background FCM message işlendi:', remoteMessage.notification?.title);
+    // Background'da özel işlemler yapılabilir
+  }
+
+  /**
+   * Token refresh'i işle
+   */
+  private async handleTokenRefresh(token: string): Promise<void> {
+    const oldToken = this.currentToken;
+    this.currentToken = token;
+    
+    // Yeni token'ı storage'a kaydet
+    await this.saveTokenToStorage(token);
+    
+    // Token değişikliğini bildir (opsiyonel callback)
+    console.log('FCM token güncellendi:', { oldToken, newToken: token });
+  }
+
+  /**
+   * Local notification göster (FCM message'ı local olarak göstermek için)
+   */
+  private showLocalNotification(
     title: string,
     body: string,
-    data?: Record<string, any>,
-    options?: {
-      sound?: boolean;
-      vibrate?: boolean;
-      badge?: number;
-      channelId?: string;
-    }
-  ): Promise<string> {
-    try {
-      const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: data || {},
-          sound: options?.sound !== false ? 'default' : undefined,
-          badge: options?.badge,
-        },
-        trigger: null, // Hemen gönder
-      });
+    data?: Record<string, any>
+  ): void {
+    // FCM'de local notification genellikle otomatik olarak gösterilir
+    // Eğer özel bir işlem gerekiyorsa burada yapılabilir
+    console.log('Local notification gösterildi:', { title, body, data });
+  }
 
-      return notificationId;
+  /**
+   * FCM topic'ine subscribe ol
+   */
+  async subscribeToTopic(topic: string): Promise<void> {
+    try {
+      // Firebase App'in başlatılıp başlatılmadığını kontrol et
+      if (!isFirebaseInitialized()) {
+        throw new Error('Firebase App başlatılmamış');
+      }
+
+      await subscribeToTopic(this.messaging, topic);
+      console.log(`FCM topic'ine subscribe olundu: ${topic}`);
     } catch (error) {
-      console.error('Local notification gönderme hatası:', error);
+      console.error('Topic subscribe hatası:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * FCM topic'inden unsubscribe ol
+   */
+  async unsubscribeFromTopic(topic: string): Promise<void> {
+    try {
+      // Firebase App'in başlatılıp başlatılmadığını kontrol et
+      if (!isFirebaseInitialized()) {
+        throw new Error('Firebase App başlatılmamış');
+      }
+
+      await unsubscribeFromTopic(this.messaging, topic);
+      console.log(`FCM topic'inden unsubscribe olundu: ${topic}`);
+    } catch (error) {
+      console.error('Topic unsubscribe hatası:', error);
       throw error;
     }
   }
@@ -301,36 +318,65 @@ class NotificationService {
   }
 
   /**
-   * Badge sayısını güncelle
+   * Badge sayısını güncelle (iOS için)
    */
   async setBadgeCount(count: number): Promise<void> {
     try {
-      await Notifications.setBadgeCountAsync(count);
+      // Firebase App'in başlatılıp başlatılmadığını kontrol et
+      if (!isFirebaseInitialized()) {
+        console.error('❌ Firebase App başlatılmamış, badge güncellenemiyor');
+        return;
+      }
+
+      if (Platform.OS === 'ios') {
+        // Badge count FCM ile doğrudan set edilemez, server-side yapılmalı
+        // setAPNSToken boş string ile çağrılmamalı - crash'e neden oluyor
+        console.log('Badge count güncelleme isteği:', count);
+        console.log('⚠️ Badge count güncellemesi server-side yapılmalı');
+      }
     } catch (error) {
       console.error('Badge güncelleme hatası:', error);
     }
   }
 
   /**
-   * Tüm notification'ları temizle
+   * FCM token'ını sil
    */
-  async clearAllNotifications(): Promise<void> {
+  async deleteToken(): Promise<void> {
     try {
-      await Notifications.dismissAllNotificationsAsync();
-      await this.setBadgeCount(0);
+      // Firebase App'in başlatılıp başlatılmadığını kontrol et
+      if (!isFirebaseInitialized()) {
+        console.error('❌ Firebase App başlatılmamış, token silinemiyor');
+        return;
+      }
+
+      await deleteToken(this.messaging);
+      this.currentToken = null;
+      console.log('FCM token silindi');
     } catch (error) {
-      console.error('Notification temizleme hatası:', error);
+      console.error('FCM token silme hatası:', error);
     }
   }
 
   /**
-   * Belirli bir notification'ı temizle
+   * Uygulama açılma nedenini kontrol et (notification'dan mı?)
    */
-  async clearNotification(notificationId: string): Promise<void> {
+  async getInitialNotification(): Promise<FirebaseMessagingTypes.RemoteMessage | null> {
     try {
-      await Notifications.dismissNotificationAsync(notificationId);
+      // Firebase App'in başlatılıp başlatılmadığını kontrol et
+      if (!isFirebaseInitialized()) {
+        console.error('❌ Firebase App başlatılmamış, initial notification alınamıyor');
+        return null;
+      }
+
+      const remoteMessage = await getInitialNotification(this.messaging);
+      if (remoteMessage) {
+        console.log('Uygulama notification ile açıldı:', remoteMessage);
+      }
+      return remoteMessage;
     } catch (error) {
-      console.error('Notification temizleme hatası:', error);
+      console.error('Initial notification alma hatası:', error);
+      return null;
     }
   }
 

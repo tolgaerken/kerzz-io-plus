@@ -25,7 +25,8 @@ export class HttpClientService {
 
   private constructor() {
     this.axiosInstance = axios.create({
-      timeout: 30000,
+      baseURL: MONGO_API.BASE_URL,
+      timeout: MONGO_API.TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -42,7 +43,8 @@ export class HttpClientService {
         }
 
         // MongoDB API çağrıları için özel header'lar ekle
-        if (config.url === MONGO_API.BASE_URL) {
+        // Base URL kullandığımız için relative URL kontrolü yapıyoruz
+        if (config.url && (config.url.includes('/api/database/dataAction') || !config.url.startsWith('http'))) {
           config.headers = config.headers || {};
           
           // x-api-key header'ı ekle (EDOCUMENT_API'den)
@@ -72,7 +74,20 @@ export class HttpClientService {
     this.axiosInstance.interceptors.response.use(
       (response) => response,
       (error) => {
-        console.error('HTTP Error:', error);
+        // Network error detaylı loglama
+        if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
+          console.error('🌐 Network bağlantı hatası:', {
+            message: error.message,
+            config: {
+              url: error.config?.url,
+              baseURL: error.config?.baseURL,
+              method: error.config?.method,
+              timeout: error.config?.timeout
+            }
+          });
+        } else {
+          console.error('HTTP Error:', error);
+        }
         return Promise.reject(error);
       }
     );

@@ -1,17 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { isEqual } from 'lodash';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { MONGO_API, RN_CONFIG } from '../constants';
+import { socketService } from '../services/socketService';
 import {
   BaseModel,
+  BaseMongoHook,
+  BaseMongoOptions,
+  BaseMongoState,
   MongoGetParams,
   MongoPayload,
-  SocketMongo,
-  BaseMongoState,
-  BaseMongoOptions,
-  BaseMongoHook
+  SocketMongo
 } from '../types/mongo';
 import { generateMaxiId } from '../utils/idGenerator';
-import { MONGO_API } from '../constants';
-import { socketService } from '../services/socketService';
 
 // External dependencies interfaces
 interface AuthStore {
@@ -123,7 +123,7 @@ export function useBaseMongo<T extends BaseModel>(
     // HttpClient otomatik olarak x-user-token ve x-api-key header'larını MongoDB çağrıları için ekliyor
     const result = await httpClient.post<T[]>(postMongoUrl, payload);
     return result;
-  }, [buildMongoPayload, postMongoUrl]);
+  }, [buildMongoPayload, postMongoUrl, httpClient]);
 
   /**
    * Veri getirilmeli mi kontrol et
@@ -187,7 +187,9 @@ export function useBaseMongo<T extends BaseModel>(
    * Veri getir ve state'i güncelle
    */
   const fetchData = useCallback(async (params: Partial<MongoGetParams> = {}): Promise<T[]> => {
-    console.log(`🔍 fetchData çağrıldı: ${database}.${collection}`, { params });
+    if (RN_CONFIG.ENABLE_LOGS) {
+      console.log(`🔍 fetchData çağrıldı: ${database}.${collection}`, { params });
+    }
     
     if (!database || !collection) {
       throw new Error('Database or collection not specified');
@@ -203,7 +205,9 @@ export function useBaseMongo<T extends BaseModel>(
     };
 
     if (shouldFetchData(fetchParams.filter, fetchParams.sort, fetchParams.project, false)) {
-      console.log(`🚀 Veri çekiliyor: ${database}.${collection}`);
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`🚀 Veri çekiliyor: ${database}.${collection}`);
+      }
       backupFilterRef.current = { 
         filter: fetchParams.filter!, 
         sort: fetchParams.sort!, 
@@ -216,7 +220,9 @@ export function useBaseMongo<T extends BaseModel>(
 
       try {
         const items = await getCollection(fetchParams);
-        console.log(`✅ Veri çekildi: ${database}.${collection}, ${items.length} item`);
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.log(`✅ Veri çekildi: ${database}.${collection}, ${items.length} item`);
+        }
         
         setState(prev => ({ 
           ...prev, 
@@ -239,10 +245,12 @@ export function useBaseMongo<T extends BaseModel>(
         throw error;
       }
     } else {
-      console.log(`⏭️  Fetch atlandı (cache kullanıldı): ${database}.${collection}`);
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`⏭️  Fetch atlandı (cache kullanıldı): ${database}.${collection}`);
+      }
       return Promise.resolve(state.items);
     }
-  }, [database, collection, shouldFetchData, getCollection]);
+  }, [database, collection, shouldFetchData, getCollection, state.items]);
 
   /**
    * Upsert işlemi
@@ -266,13 +274,33 @@ export function useBaseMongo<T extends BaseModel>(
     try {
       const response = await httpClient.post<T>(postMongoUrl, payload);
       const realId = (response as any)?.id || (data as any)?.id || targetId;
-      upsertItem(realId, response);
+      
+      // Local state'i güncelle
+      setState(prev => {
+        const index = prev.items.findIndex(item => (item as any).id === realId);
+        
+        if (index !== -1) {
+          // Mevcut öğeyi güncelle
+          const updatedItem: T = { ...prev.items[index], ...response } as T;
+          const newItems = [
+            ...prev.items.slice(0, index),
+            updatedItem,
+            ...prev.items.slice(index + 1),
+          ];
+          return { ...prev, items: newItems };
+        } else {
+          // Yeni öğe ekle
+          const newItem: T = { id: realId, ...(response as any) } as T;
+          return { ...prev, items: [...prev.items, newItem] };
+        }
+      });
+      
       return response;
     } catch (error) {
       console.error('Upsert error:', error);
       throw error;
     }
-  }, [createPayload, postMongoUrl, userInfo]);
+  }, [createPayload, postMongoUrl, userInfo, httpClient]);
 
   /**
    * Silme işlemi
@@ -288,7 +316,11 @@ export function useBaseMongo<T extends BaseModel>(
       const response = await httpClient.post(postMongoUrl, payload);
       
       if (typeof idOrFilter === 'string') {
-        deleteItem(idOrFilter);
+        // Local state'ten sil
+        setState(prev => ({
+          ...prev,
+          items: prev.items.filter(item => item.id !== idOrFilter)
+        }));
       }
       
       return response;
@@ -296,7 +328,7 @@ export function useBaseMongo<T extends BaseModel>(
       console.error('Delete error:', error);
       throw error;
     }
-  }, [createPayload, postMongoUrl]);
+  }, [createPayload, postMongoUrl, httpClient]);
 
   /**
    * Active item set et
@@ -388,10 +420,10 @@ export function useBaseMongo<T extends BaseModel>(
    */
   const getStaticItems = useCallback((): T[] => {
     if (staticItemsRef.current.length === 0) {
-      setStaticItems();
+      staticItemsRef.current = [...state.items];
     }
     return staticItemsRef.current;
-  }, []);
+  }, [state.items]);
 
   /**
    * Static items set et
@@ -503,7 +535,9 @@ export function useBaseMongo<T extends BaseModel>(
   // Socket integration effect
   useEffect(() => {
     if (socketUpdates && database && collection) {
-      console.log(`🔌 Socket dinleyicisi başlatılıyor: ${database}.${collection}`);
+      if (RN_CONFIG.ENABLE_LOGS) {
+        console.log(`🔌 Socket dinleyicisi başlatılıyor: ${database}.${collection}`);
+      }
       
       // Socket service'i başlat
       socketService.initialize();
@@ -517,52 +551,56 @@ export function useBaseMongo<T extends BaseModel>(
         collection,
         serviceName,
         (socketData: SocketMongo) => {
-          console.group(`📡 useBaseMongo Socket Güncellemesi: ${database}.${collection}`);
-          console.log('⏰ Zaman:', new Date().toLocaleString('tr-TR'));
-          console.log('🔄 İşlem Türü:', socketData.operationType);
-          console.log('🆔 Doküman ID:', socketData.documentKey?.id || 'Bilinmiyor');
-          
-          // Rezervasyon collection'ı için özel logging
-          if (database === 'restaurant' && collection === 'reservations') {
-            console.log('🍽️ REZERVASYON SOCKET GÜNCELLEMESİ - useBaseMongo');
+          if (RN_CONFIG.ENABLE_LOGS) {
+            console.group(`📡 useBaseMongo Socket Güncellemesi: ${database}.${collection}`);
+            console.log('⏰ Zaman:', new Date().toLocaleString('tr-TR'));
+            console.log('🔄 İşlem Türü:', socketData.operationType);
+            console.log('🆔 Doküman ID:', socketData.documentKey?.id || 'Bilinmiyor');
             
-            if (socketData.operationType === 'insert' && socketData.fullDocument) {
-              console.log('➕ Yeni Rezervasyon (useBaseMongo):', {
-                müşteri: `${socketData.fullDocument.customer?.firstName || ''} ${socketData.fullDocument.customer?.lastName || ''}`.trim(),
-                telefon: socketData.fullDocument.customer?.phone,
-                tarih: socketData.fullDocument.reservationDate,
-                saat: socketData.fullDocument.reservationTime,
-                masaId: socketData.fullDocument.tableId,
-                durum: socketData.fullDocument.status,
-                kişiSayısı: socketData.fullDocument.partySize
-              });
-            }
-            
-            if (socketData.operationType === 'update' && socketData.updateDescription?.updatedFields) {
-              console.log('📝 Rezervasyon Güncelleme (useBaseMongo):', {
-                id: socketData.documentKey?.id,
-                güncellenenAlanlar: socketData.updateDescription.updatedFields
-              });
+            // Rezervasyon collection'ı için özel logging
+            if (database === 'restaurant' && collection === 'reservations') {
+              console.log('🍽️ REZERVASYON SOCKET GÜNCELLEMESİ - useBaseMongo');
               
-              if (socketData.updateDescription.updatedFields.status) {
-                console.log('🔄 Durum Değişikliği (useBaseMongo):', socketData.updateDescription.updatedFields.status);
+              if (socketData.operationType === 'insert' && socketData.fullDocument) {
+                console.log('➕ Yeni Rezervasyon (useBaseMongo):', {
+                  müşteri: `${socketData.fullDocument.customer?.firstName || ''} ${socketData.fullDocument.customer?.lastName || ''}`.trim(),
+                  telefon: socketData.fullDocument.customer?.phone,
+                  tarih: socketData.fullDocument.reservationDate,
+                  saat: socketData.fullDocument.reservationTime,
+                  masaId: socketData.fullDocument.tableId,
+                  durum: socketData.fullDocument.status,
+                  kişiSayısı: socketData.fullDocument.partySize
+                });
+              }
+              
+              if (socketData.operationType === 'update' && socketData.updateDescription?.updatedFields) {
+                console.log('📝 Rezervasyon Güncelleme (useBaseMongo):', {
+                  id: socketData.documentKey?.id,
+                  güncellenenAlanlar: socketData.updateDescription.updatedFields
+                });
+                
+                if (socketData.updateDescription.updatedFields.status) {
+                  console.log('🔄 Durum Değişikliği (useBaseMongo):', socketData.updateDescription.updatedFields.status);
+                }
+              }
+              
+              if (socketData.operationType === 'delete') {
+                console.log('🗑️ Rezervasyon Silindi (useBaseMongo)');
               }
             }
             
-            if (socketData.operationType === 'delete') {
-              console.log('🗑️ Rezervasyon Silindi (useBaseMongo)');
-            }
+            console.log('📊 Ham Socket Verisi:', socketData);
+            console.groupEnd();
           }
-          
-          console.log('📊 Ham Socket Verisi:', socketData);
-          console.groupEnd();
           
           // Socket callback'lerini tetikle
           socketCallbacksRef.current.forEach(callback => {
             try {
               callback(socketData);
             } catch (error) {
-              console.error('❌ Socket callback hatası:', error);
+              if (RN_CONFIG.ENABLE_LOGS) {
+                console.error('❌ Socket callback hatası:', error);
+              }
             }
           });
           
@@ -572,11 +610,13 @@ export function useBaseMongo<T extends BaseModel>(
       );
       
       return () => {
-        console.log(`🔌 Socket dinleyicisi kapatılıyor: ${database}.${collection}`);
+        if (RN_CONFIG.ENABLE_LOGS) {
+          console.log(`🔌 Socket dinleyicisi kapatılıyor: ${database}.${collection}`);
+        }
         unsubscribe();
       };
     }
-  }, [socketUpdates, database, collection]);
+  }, [socketUpdates, database, collection, handleSocketChange]);
 
   // Auto fetch effect
   useEffect(() => {

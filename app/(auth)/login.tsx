@@ -33,7 +33,8 @@ const LoginPage: React.FC = () => {
     sendOTP, 
     verifyOTP,
     clearErrors,
-    resetOTPFlow
+    resetOTPFlow,
+    debugStorage
   } = useAuthStore();
   
   const { theme } = useTheme();
@@ -249,6 +250,18 @@ const LoginPage: React.FC = () => {
             </Text>
             &apos;nı kabul etmiş olursunuz.
           </Text>
+          
+          {/* Debug Button - Sadece development'ta göster */}
+          {__DEV__ && (
+            <TouchableOpacity
+              style={[styles.debugButton, { borderColor: theme.colors.border }]}
+              onPress={debugStorage}
+            >
+              <Text style={[styles.debugButtonText, { color: theme.colors.textLight }]}>
+                🔍 Debug Storage
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -382,6 +395,17 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textDecorationLine: 'underline',
+  },
+  debugButton: {
+    marginTop: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  debugButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 

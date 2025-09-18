@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { useNotifications } from '../hooks/useNotifications';
 import { useAuthStore } from '../../auth';
+import { useNotifications } from '../hooks/useNotifications';
+import FCMTokenService from '../services/fcmTokenService';
 
 interface NotificationInitializerProps {
   children: React.ReactNode;
@@ -60,21 +61,13 @@ const NotificationInitializer: React.FC<NotificationInitializerProps> = ({ child
  */
 const sendTokenToServer = async (token: string, userId: string): Promise<void> => {
   try {
-    // Bu fonksiyon auth modülündeki httpClient'ı kullanarak
-    // token'ı sunucuya gönderecek
-    
-    // Örnek API çağrısı:
-    // await httpClient.post('/api/notifications/register-token', {
-    //   token,
-    //   userId,
-    //   platform: Platform.OS,
-    //   deviceId: Device.modelId,
-    // });
-    
-    console.log('Token sunucuya gönderildi:', { token, userId });
+    const tokenService = FCMTokenService.getInstance();
+    await tokenService.syncToken(token, userId);
+    console.log('Token başarıyla sunucuya gönderildi:', { token, userId });
   } catch (error) {
     console.error('Token gönderme hatası:', error);
-    throw error;
+    // Token gönderme hatası kritik değil, uygulamanın çalışmasını engellemez
+    // Sadece log'larız ve devam ederiz
   }
 };
 

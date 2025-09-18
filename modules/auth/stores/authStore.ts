@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { licenseManager } from '../../../utils/licenseStorage';
 import { autoLoginFromStorage, logout as kerzzLogout, requestOtpSms, verifyOtpSms } from '../services/kerzz-sso';
 import { AuthState, LoginCredentials } from '../types/auth';
@@ -41,6 +42,7 @@ interface AuthStore extends AuthStateExtended {
   initializeAuth: () => Promise<boolean>;
   setSelectedLicense: (license: any) => Promise<void>;
   completeLogin: (userInfo: any) => Promise<boolean>;
+  debugStorage: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -260,6 +262,33 @@ export const useAuthStore = create<AuthStore>()(
             }
           });
 
+          console.log('💾 Auth state set edildi, persist edilecek:', {
+            isAuthenticated: true,
+            userId: user.id,
+            userName: user.name,
+            hasUser: true,
+            hasUserInfo: true
+          });
+
+          // FCM token'ını kaydet (background'da)
+          try {
+            const { FCMTokenService, NotificationService } = await import('../../notifications');
+            const fcmTokenService = FCMTokenService.getInstance();
+            const notificationService = NotificationService.getInstance();
+            
+            const currentToken = notificationService.getCurrentToken();
+            if (currentToken) {
+              // Background'da token senkronizasyonu yap
+              fcmTokenService.syncToken(currentToken, user.id).catch(error => {
+                console.error('❌ FCM token senkronizasyon hatası (background):', error);
+              });
+              console.log('🔔 FCM token senkronizasyonu başlatıldı (background)');
+            }
+          } catch (error) {
+            console.error('❌ FCM token senkronizasyon başlatma hatası:', error);
+            // Bu hata login işlemini engellemez
+          }
+
           return true;
         } catch (error: any) {
           console.error('❌ Login tamamlama hatası:', error);
@@ -320,7 +349,30 @@ export const useAuthStore = create<AuthStore>()(
 
       // Logout
       logout: async () => {
+        const currentState = get();
+        
         try {
+          // FCM token'ını deaktif et
+          if (currentState.user?.id) {
+            try {
+              // Dinamik import kullanarak circular dependency'yi önleyelim
+              const { FCMTokenService, NotificationService } = await import('../../notifications');
+              const fcmTokenService = FCMTokenService.getInstance();
+              const notificationService = NotificationService.getInstance();
+              
+              // Mevcut token'ı al ve deaktif et
+              const currentToken = notificationService.getCurrentToken();
+              
+              if (currentToken) {
+                await fcmTokenService.deactivateToken(currentToken, currentState.user.id);
+                console.log('🔔 FCM token deaktif edildi');
+              }
+            } catch (error) {
+              console.error('❌ FCM token deaktif etme hatası:', error);
+              // Bu hata kritik değil, logout işlemini engellemez
+            }
+          }
+          
           // Kerzz SSO token'ını temizle
           await kerzzLogout();
           console.log('🚪 Kullanıcı çıkış yapıyor');
@@ -379,7 +431,45 @@ export const useAuthStore = create<AuthStore>()(
         set({ isInitializing: true, error: null });
         
         try {
-          console.log('🚀 Auth store başlatılıyor, localStorage kontrolü...');
+          console.log('🚀 Auth store başlatılıyor...');
+          
+          // Önce persist edilmiş auth durumunu kontrol et
+          const currentState = get();
+          
+          console.log('📋 Mevcut persist edilmiş durum:', {
+            isAuthenticated: currentState.isAuthenticated,
+            hasUser: currentState.hasUser,
+            hasUserInfo: currentState.hasUserInfo,
+            userId: currentState.user?.id || 'Yok',
+            userName: currentState.user?.name || 'Yok'
+          });
+          
+          // Eğer zaten authenticate edilmiş durumda ve kullanıcı bilgileri varsa
+          if (currentState.isAuthenticated && currentState.user && currentState.userInfo) {
+            console.log('✅ Persist edilmiş auth durumu bulundu, token kontrolü yapılıyor...');
+            
+            // Token'ın hala geçerli olup olmadığını kontrol et
+            try {
+              const response = await autoLoginFromStorage();
+              
+              if (response.success && response.userInfo) {
+                // Token geçerli, kullanıcı bilgilerini güncelle
+                await get().completeLogin(response.userInfo);
+                console.log('✅ Token geçerli, kullanıcı bilgileri güncellendi');
+              } else {
+                // Token geçersiz, mevcut persist edilmiş durumu kullan
+                console.log('⚠️ Token geçersiz ama persist edilmiş durum var, mevcut durumu koruyoruz');
+              }
+            } catch (tokenError) {
+              console.log('⚠️ Token kontrolü başarısız, mevcut persist edilmiş durumu koruyoruz:', tokenError);
+            }
+            
+            set({ isInitializing: false });
+            return true;
+          }
+          
+          // Persist edilmiş auth durumu yoksa, localStorage'dan auto login dene
+          console.log('ℹ️ Persist edilmiş auth durumu yok, localStorage kontrolü...');
           
           const response = await autoLoginFromStorage();
           
@@ -400,7 +490,7 @@ export const useAuthStore = create<AuthStore>()(
             return false;
           }
         } catch (error: any) {
-          console.log('❌ Auto login hatası:', error);
+          console.log('❌ Auth initialization hatası:', error);
           
           set({
             isInitializing: false,
@@ -415,6 +505,26 @@ export const useAuthStore = create<AuthStore>()(
           });
           
           return false;
+        }
+      },
+
+      // Debug: AsyncStorage'ı kontrol et
+      debugStorage: async () => {
+        try {
+          const authStorageData = await AsyncStorage.getItem('auth-storage');
+          console.log('🔍 AsyncStorage auth-storage içeriği:', authStorageData);
+          
+          if (authStorageData) {
+            const parsed = JSON.parse(authStorageData);
+            console.log('📋 Parsed auth storage:', {
+              isAuthenticated: parsed.state?.isAuthenticated,
+              hasUser: parsed.state?.hasUser,
+              userId: parsed.state?.user?.id,
+              userName: parsed.state?.user?.name
+            });
+          }
+        } catch (error) {
+          console.error('❌ Debug storage hatası:', error);
         }
       },
 
@@ -442,9 +552,17 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'auth-storage',
+      storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        persistedData: state.persistedData,
-        selectedLicense: state.selectedLicense
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        isFirstLogin: state.isFirstLogin,
+        restaurant: state.restaurant,
+        userInfo: state.userInfo,
+        selectedLicense: state.selectedLicense,
+        hasUser: state.hasUser,
+        hasUserInfo: state.hasUserInfo,
+        persistedData: state.persistedData
       })
     }
   )
