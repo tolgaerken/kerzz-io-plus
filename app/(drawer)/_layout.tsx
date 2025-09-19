@@ -3,27 +3,26 @@ import React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ProtectedRoute } from '@modules/auth';
+import { useTheme } from '@modules/theme';
 
 export default function DrawerLayout() {
-  const colorScheme = useColorScheme();
+  const { theme } = useTheme();
 
   return (
     <ProtectedRoute requireAuth={true}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Drawer
         screenOptions={{
-          drawerActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-          drawerInactiveTintColor: Colors[colorScheme ?? 'light'].text,
+          drawerActiveTintColor: theme.colors.primary,
+          drawerInactiveTintColor: theme.colors.text,
           drawerStyle: {
-            backgroundColor: Colors[colorScheme ?? 'light'].background,
+            backgroundColor: theme.colors.background,
           },
           headerStyle: {
-            backgroundColor: Colors[colorScheme ?? 'light'].background,
+            backgroundColor: theme.colors.background,
           },
-          headerTintColor: Colors[colorScheme ?? 'light'].text,
+          headerTintColor: theme.colors.text,
         }}>
         <Drawer.Screen
           name="index"
@@ -53,6 +52,15 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="opportunities"
+          options={{
+            title: 'Fırsatlar',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="target" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="profile"
           options={{
             title: 'Profil',
@@ -68,6 +76,20 @@ export default function DrawerLayout() {
             drawerIcon: ({ color, size }) => (
               <IconSymbol size={size} name="gear" color={color} />
             ),
+          }}
+        />
+        <Drawer.Screen
+          name="sale-detail"
+          options={{
+            title: 'Satış Detayı',
+            drawerItemStyle: { display: 'none' }, // Hide from drawer menu
+          }}
+        />
+        <Drawer.Screen
+          name="opportunity-detail"
+          options={{
+            title: 'Fırsat Detayı',
+            drawerItemStyle: { display: 'none' }, // Hide from drawer menu
           }}
         />
         </Drawer>

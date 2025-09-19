@@ -1,65 +1,149 @@
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useThemeColor } from '../../hooks/use-theme-color';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAuthStore } from '@modules/auth';
+import { router } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSalesQuery } from '../../modules/data-layer/hooks/useSalesQuery';
+import { useStyles } from '../../modules/theme';
 import { TSale } from '../../types/dto';
 import { ThemedText } from '../themed-text';
 import { ThemedView } from '../themed-view';
+import { SalesCard } from './SalesCard';
 import { SalesFilter } from './SalesFilter';
 import { SalesStats } from './SalesStats';
+import { SalesToolbar } from './SalesToolbar';
 
-export function SalesScreen() {
+interface SalesScreenProps {
+  initialSearchQuery?: string;
+}
+
+export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  
+  // Initial search query'nin sadece bir kez çalışması için ref
+  const hasProcessedInitialQuery = useRef(false);
+  
+  // Arama state'leri
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<TSale[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  
+  // Loading state'leri - hangi satışın hangi butonu loading
+  const [loadingStates, setLoadingStates] = useState<{
+    approving: Set<string>;
+    invoiceApproving: Set<string>;
+  }>({
+    approving: new Set(),
+    invoiceApproving: new Set(),
+  });
 
-  const backgroundColor = useThemeColor({}, 'background');
-  const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
-  const cardBackgroundColor = useThemeColor({ light: '#F9FAFB', dark: '#1F2937' }, 'background');
-  const borderColor = useThemeColor({ light: '#E5E7EB', dark: '#374151' }, 'text');
+  const { colors, spacing, fontSize } = useStyles();
+  const { user } = useAuthStore();
 
   const salesQuery = useSalesQuery();
   
-  // Seçilen ay/yıl için satışları ve istatistikleri getir
-  const salesStatsQuery = salesQuery.useSalesStats(selectedYear, selectedMonth);
+  // Seçilen ay/yıl için satışları ve istatistikleri getir (arama modunda devre dışı)
+  const salesStatsQuery = salesQuery.useSalesStats(selectedYear, selectedMonth, {
+    enabled: !showSearchResults // Arama modunda devre dışı
+  });
   
-  const styles = StyleSheet.create({
+  // Mutation hook'ları
+  const approveSaleMutation = salesQuery.useApproveSale();
+  const approveInvoiceMutation = salesQuery.useApproveInvoice();
+
+  // Loading state helper fonksiyonları
+  const setApproveLoading = useCallback((saleId: string, loading: boolean) => {
+    setLoadingStates(prev => ({
+      ...prev,
+      approving: loading 
+        ? new Set([...prev.approving, saleId])
+        : new Set([...prev.approving].filter(id => id !== saleId))
+    }));
+  }, []);
+
+  const setInvoiceApproveLoading = useCallback((saleId: string, loading: boolean) => {
+    setLoadingStates(prev => ({
+      ...prev,
+      invoiceApproving: loading 
+        ? new Set([...prev.invoiceApproving, saleId])
+        : new Set([...prev.invoiceApproving].filter(id => id !== saleId))
+    }));
+  }, []);
+  
+  const styles = {
     container: {
       flex: 1,
-      backgroundColor,
+      backgroundColor: colors.background,
     },
     header: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: spacing.medium,
+      paddingVertical: spacing.small,
       borderBottomWidth: 1,
-      borderBottomColor: useThemeColor({ light: '#E5E7EB', dark: '#374151' }, 'text') + '30',
+      borderBottomColor: colors.border + '30',
     },
     title: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: textColor,
-      textAlign: 'center',
-    },
-    subtitle: {
-      fontSize: 14,
-      color: textColor + '80',
-      textAlign: 'center',
-      marginTop: 4,
+      fontSize: fontSize.xlarge,
+      fontWeight: 'bold' as const,
+      color: colors.text,
+      textAlign: 'center' as const,
     },
     errorContainer: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 32,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+      padding: spacing.xlarge,
     },
     errorText: {
-      fontSize: 16,
-      color: '#EF4444',
-      textAlign: 'center',
-      marginTop: 16,
+      fontSize: fontSize.medium,
+      color: colors.error,
+      textAlign: 'center' as const,
+      marginTop: spacing.medium,
     },
-  });
+    searchContainer: {
+      paddingHorizontal: spacing.medium,
+      paddingVertical: spacing.small,
+      backgroundColor: colors.background,
+    },
+    searchInputContainer: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border + '60',
+      borderRadius: 12,
+      paddingHorizontal: spacing.small,
+      paddingVertical: spacing.small,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: fontSize.medium,
+      color: colors.text,
+      paddingHorizontal: spacing.small,
+      paddingVertical: 0,
+    },
+    searchButton: {
+      padding: spacing.small,
+      marginLeft: spacing.small,
+    },
+    clearButton: {
+      padding: spacing.small,
+    },
+    searchResultsHeader: {
+      paddingHorizontal: spacing.medium,
+      paddingVertical: spacing.small,
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border + '30',
+    },
+    searchResultsTitle: {
+      fontSize: fontSize.medium,
+      fontWeight: 'bold' as const,
+      color: colors.text,
+    },
+  };
 
   const handleYearChange = useCallback((year: number) => {
     setSelectedYear(year);
@@ -84,117 +168,165 @@ export function SalesScreen() {
     );
   }, []);
 
-  const getMonthName = (month: number) => {
-    const months = [
-      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-    ];
-    return months[month - 1];
-  };
+  const handleViewDetails = useCallback((sale: TSale) => {
+    router.push({
+      pathname: '/(drawer)/sale-detail',
+      params: {
+        saleData: JSON.stringify(sale)
+      }
+    });
+  }, []);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('tr-TR', {
-      style: 'currency',
-      currency: 'TRY',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(new Date(date));
-  };
-
-  const getStatusInfo = (sale: TSale) => {
-    if (sale.approved) {
-      return {
-        text: 'Onaylandı',
-        badgeStyle: { backgroundColor: '#10B981' + '20' },
-        textStyle: { color: '#10B981' },
-      };
-    } else {
-      return {
-        text: 'Beklemede',
-        badgeStyle: { backgroundColor: '#F59E0B' + '20' },
-        textStyle: { color: '#F59E0B' },
-      };
+  const handleSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+      return;
     }
-  };
+
+    setIsSearching(true);
+    try {
+      // Satış numarası ile arama yap
+      const results = await salesQuery.searchSalesByNumber(query.trim());
+      setSearchResults(results || []);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('Arama hatası:', error);
+      setSearchResults([]);
+      setShowSearchResults(true);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [salesQuery]);
+
+  const handleSearchInputChange = useCallback((text: string) => {
+    setSearchQuery(text);
+    if (!text.trim()) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+    }
+  }, []);
+
+  const handleSearchSubmit = useCallback(() => {
+    handleSearch(searchQuery);
+  }, [searchQuery, handleSearch]);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setShowSearchResults(false);
+    setSearchResults([]);
+  }, []);
+
+  // Initial search query'yi handle et (notification'dan gelen) - sadece bir kez
+  useEffect(() => {
+    if (initialSearchQuery && initialSearchQuery.trim() && !hasProcessedInitialQuery.current) {
+      console.log('🔍 Notification\'dan gelen arama sorgusu:', initialSearchQuery);
+      hasProcessedInitialQuery.current = true;
+      
+      setSearchQuery(initialSearchQuery.trim());
+      
+      // Direkt arama yap (handleSearch dependency'sinden kaçınmak için)
+      const performSearch = async () => {
+        setIsSearching(true);
+        try {
+          const results = await salesQuery.searchSalesByNumber(initialSearchQuery.trim());
+          setSearchResults(results || []);
+          setShowSearchResults(true);
+          console.log('✅ Initial search tamamlandı:', results?.length || 0, 'sonuç');
+        } catch (error) {
+          console.error('❌ Initial search hatası:', error);
+          setSearchResults([]);
+          setShowSearchResults(true);
+        } finally {
+          setIsSearching(false);
+        }
+      };
+      
+      performSearch();
+    }
+  }, [initialSearchQuery, salesQuery]);
+
+  const handleApprove = useCallback((sale: TSale) => {
+    if (!sale.id) {
+      console.error('Satış ID bulunamadı');
+      return;
+    }
+
+    const updateData = {
+      approved: !sale.approved, // Toggle approval
+      approved_userId: user?.id || 'current-user-id',
+      approved_userName: user?.name || 'Current User',
+      approve_time: new Date(),
+    };
+
+    // Loading başlat
+    setApproveLoading(sale.id!, true);
+
+    approveSaleMutation.mutate(
+      { id: sale.id!, data: updateData },
+      {
+        onSuccess: () => {
+          setApproveLoading(sale.id!, false);
+          console.log('✅ Satış onayı güncellendi:', sale.approved ? 'Onay kaldırıldı' : 'Onaylandı');
+        },
+        onError: (error: any) => {
+          setApproveLoading(sale.id!, false);
+          console.error('❌ Satış onayı hatası:', error);
+        },
+      }
+    );
+  }, [user, approveSaleMutation, setApproveLoading]);
+
+  const handleInvoiceApprove = useCallback((sale: TSale) => {
+    if (!sale.id) {
+      console.error('Satış ID bulunamadı');
+      return;
+    }
+
+    const updateData = {
+      invoiceApproved: !sale.invoiceApproved, // Toggle invoice approval
+      invoiceApprovedAt: new Date(),
+      invoiceApprovedBy: user?.id || 'current-user-id',
+      invoiceApprovedByName: user?.name || 'Current User',
+    };
+
+    // Loading başlat
+    setInvoiceApproveLoading(sale.id!, true);
+
+    approveInvoiceMutation.mutate(
+      { id: sale.id!, data: updateData },
+      {
+        onSuccess: () => {
+          setInvoiceApproveLoading(sale.id!, false);
+          console.log('✅ Fatura onayı güncellendi:', sale.invoiceApproved ? 'Onay kaldırıldı' : 'Onaylandı');
+        },
+        onError: (error: any) => {
+          setInvoiceApproveLoading(sale.id!, false);
+          console.error('❌ Fatura onayı hatası:', error);
+        },
+      }
+    );
+  }, [user, approveInvoiceMutation, setInvoiceApproveLoading]);
+
 
   const renderSaleCard = (sale: TSale) => {
-    const statusInfo = getStatusInfo(sale);
-
+    if (!sale.id) return null;
+    
     return (
-      <TouchableOpacity
-        key={sale.id || sale.no?.toString() || Math.random().toString()}
-        style={{
-          backgroundColor: cardBackgroundColor,
-          marginHorizontal: 16,
-          marginVertical: 6,
-          padding: 16,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: borderColor + '40',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 3.84,
-          elevation: 5,
-        }}
-        onPress={() => handleSalePress(sale)}
-        activeOpacity={0.7}
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-          <ThemedText style={{ fontSize: 18, fontWeight: 'bold', color: tintColor }}>
-            #{sale.no || sale.number}
-          </ThemedText>
-          <ThemedText style={{ fontSize: 14, color: textColor + '80' }}>
-            {formatDate(sale.saleDate)}
-          </ThemedText>
-        </View>
-
-        <ThemedText style={{ fontSize: 16, fontWeight: '600', color: textColor, marginBottom: 4 }}>
-          {sale.company}
-        </ThemedText>
-
-        {sale.description && (
-          <ThemedText style={{ fontSize: 14, color: textColor + '90', marginBottom: 8 }} numberOfLines={2}>
-            {sale.description}
-          </ThemedText>
-        )}
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-          <ThemedText style={{ fontSize: 12, color: textColor + '70' }}>
-            Satış: {sale.sellerName || 'Belirtilmemiş'}
-          </ThemedText>
-        </View>
-
-        <View style={{ 
-          flexDirection: 'row', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginTop: 8, 
-          paddingTop: 8, 
-          borderTopWidth: 1, 
-          borderTopColor: borderColor + '30' 
-        }}>
-          <ThemedText style={{ fontSize: 16, fontWeight: 'bold', color: textColor }}>
-            {formatCurrency(sale.grandTotal || sale.total || 0)}
-          </ThemedText>
-          
-          <View style={[
-            { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-            statusInfo.badgeStyle
-          ]}>
-            <Text style={[{ fontSize: 12, fontWeight: '600' }, statusInfo.textStyle]}>
-              {statusInfo.text}
-            </Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+      <View key={sale.id || sale.no?.toString() || Math.random().toString()}>
+        <SalesCard
+          sale={sale}
+          onPress={handleSalePress}
+        />
+        <SalesToolbar
+          sale={sale}
+          onApprove={handleApprove}
+          onInvoiceApprove={handleInvoiceApprove}
+          onViewDetails={handleViewDetails}
+          isApprovingLoading={loadingStates.approving.has(sale.id)}
+          isInvoiceApprovingLoading={loadingStates.invoiceApproving.has(sale.id)}
+        />
+      </View>
     );
   };
 
@@ -225,24 +357,44 @@ export function SalesScreen() {
   }
 
   const sales = salesStatsQuery.data || [];
+  const displaySales = showSearchResults ? searchResults : sales;
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header - Fixed */}
-      <View style={styles.header}>
-        <ThemedText style={styles.title}>Satışlar</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          {getMonthName(selectedMonth)} {selectedYear}
-        </ThemedText>
+      {/* Arama Kutusu */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <MaterialIcons name="search" size={20} color={colors.text + '60'} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Satış numarası ile ara..."
+            placeholderTextColor={colors.text + '60'}
+            value={searchQuery}
+            onChangeText={handleSearchInputChange}
+            onSubmitEditing={handleSearchSubmit}
+            keyboardType="numeric"
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity style={styles.clearButton} onPress={handleClearSearch}>
+              <MaterialIcons name="clear" size={20} color={colors.text + '60'} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.searchButton} onPress={handleSearchSubmit}>
+            <MaterialIcons name="search" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Filtreler - Fixed */}
-      <SalesFilter
-        selectedYear={selectedYear}
-        selectedMonth={selectedMonth}
-        onYearChange={handleYearChange}
-        onMonthChange={handleMonthChange}
-      />
+      {/* Filtreler - Fixed (sadece arama sonuçları gösterilmiyorsa) */}
+      {!showSearchResults && (
+        <SalesFilter
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          onYearChange={handleYearChange}
+          onMonthChange={handleMonthChange}
+        />
+      )}
 
       {/* Scrollable Content */}
       <ScrollView
@@ -252,38 +404,57 @@ export function SalesScreen() {
           <RefreshControl
             refreshing={salesStatsQuery.isFetching && !salesStatsQuery.isLoading}
             onRefresh={handleRefresh}
-            colors={[tintColor]}
-            tintColor={tintColor}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
           />
         }
       >
-        {/* İstatistikler */}
-        <SalesStats stats={salesStatsQuery.stats} />
+        {/* Arama Sonuçları Başlığı */}
+        {showSearchResults && (
+          <View style={styles.searchResultsHeader}>
+            <ThemedText style={styles.searchResultsTitle}>
+              Arama Sonuçları ({searchResults.length} sonuç)
+            </ThemedText>
+          </View>
+        )}
 
-        {/* Loading State */}
-        {salesStatsQuery.isLoading && (
-          <View style={{ padding: 32, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={tintColor} />
-            <ThemedText style={{ marginTop: 16, color: textColor + '80' }}>
+        {/* İstatistikler (sadece normal görünümde) */}
+        {!showSearchResults && <SalesStats stats={salesStatsQuery.stats} />}
+
+        {/* Arama Loading State */}
+        {isSearching && (
+          <View style={{ padding: spacing.xlarge, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <ThemedText style={{ marginTop: spacing.medium, color: colors.textLight }}>
+              Aranıyor...
+            </ThemedText>
+          </View>
+        )}
+
+        {/* Normal Loading State */}
+        {!showSearchResults && salesStatsQuery.isLoading && (
+          <View style={{ padding: spacing.xlarge, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <ThemedText style={{ marginTop: spacing.medium, color: colors.textLight }}>
               Satışlar yükleniyor...
             </ThemedText>
           </View>
         )}
 
         {/* Empty State */}
-        {!salesStatsQuery.isLoading && sales.length === 0 && (
-          <View style={{ padding: 32, alignItems: 'center' }}>
-            <ThemedText style={{ color: textColor + '80', textAlign: 'center' }}>
-              Seçilen dönemde satış bulunamadı
+        {!isSearching && !salesStatsQuery.isLoading && displaySales.length === 0 && (
+          <View style={{ padding: spacing.xlarge, alignItems: 'center' }}>
+            <ThemedText style={{ color: colors.textLight, textAlign: 'center' }}>
+              {showSearchResults ? 'Arama sonucu bulunamadı' : 'Seçilen dönemde satış bulunamadı'}
             </ThemedText>
           </View>
         )}
 
         {/* Satış Listesi */}
-        {sales.map((sale) => renderSaleCard(sale))}
+        {!isSearching && displaySales.map((sale) => renderSaleCard(sale))}
 
         {/* Bottom Padding */}
-        <View style={{ height: 16 }} />
+        <View style={{ height: spacing.medium }} />
       </ScrollView>
     </ThemedView>
   );

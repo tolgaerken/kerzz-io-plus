@@ -4,14 +4,13 @@ import {
     FlatList,
     RefreshControl,
     StyleSheet,
-    Text,
-    TouchableOpacity,
     View
 } from 'react-native';
 import { useThemeColor } from '../../hooks/use-theme-color';
 import { TSale } from '../../types/dto';
 import { ThemedText } from '../themed-text';
 import { ThemedView } from '../themed-view';
+import { SalesCard } from './SalesCard';
 
 interface SalesListProps {
   sales: TSale[];
@@ -26,7 +25,7 @@ export function SalesList({
   loading = false, 
   refreshing = false, 
   onRefresh, 
-  onSalePress 
+  onSalePress
 }: SalesListProps) {
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -149,10 +148,19 @@ export function SalesList({
     },
   });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('tr-TR', {
+  const formatCurrency = (amount: number, currency: string = 'tl') => {
+    const currencyMap: { [key: string]: string } = {
+      'tl': 'TRY',
+      'usd': 'USD',
+      'eur': 'EUR'
+    };
+    
+    const currencyCode = currencyMap[currency.toLowerCase()] || 'TRY';
+    const locale = currencyCode === 'TRY' ? 'tr-TR' : 'en-US';
+    
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency: 'TRY',
+      currency: currencyCode,
       minimumFractionDigits: 2,
     }).format(amount);
   };
@@ -182,51 +190,11 @@ export function SalesList({
   };
 
   const renderSaleItem = ({ item }: { item: TSale }) => {
-    const statusInfo = getStatusInfo(item);
-
     return (
-      <TouchableOpacity
-        style={styles.saleCard}
-        onPress={() => onSalePress?.(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.saleHeader}>
-          <ThemedText style={styles.saleNumber}>
-            #{item.no || item.number}
-          </ThemedText>
-          <ThemedText style={styles.saleDate}>
-            {formatDate(item.saleDate)}
-          </ThemedText>
-        </View>
-
-        <ThemedText style={styles.companyName}>
-          {item.company}
-        </ThemedText>
-
-        {item.description && (
-          <ThemedText style={styles.saleDescription} numberOfLines={2}>
-            {item.description}
-          </ThemedText>
-        )}
-
-        <View style={styles.sellerInfo}>
-          <ThemedText style={styles.sellerText}>
-            Satış: {item.sellerName || 'Belirtilmemiş'}
-          </ThemedText>
-        </View>
-
-        <View style={styles.saleFooter}>
-          <ThemedText style={styles.saleAmount}>
-            {formatCurrency(item.grandTotal || item.total || 0)}
-          </ThemedText>
-          
-          <View style={[styles.statusBadge, statusInfo.badgeStyle]}>
-            <Text style={[styles.statusText, statusInfo.textStyle]}>
-              {statusInfo.text}
-            </Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+      <SalesCard 
+        sale={item} 
+        onPress={onSalePress}
+      />
     );
   };
 

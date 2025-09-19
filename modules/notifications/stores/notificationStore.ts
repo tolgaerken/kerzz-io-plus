@@ -1,13 +1,12 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  NotificationData, 
-  NotificationPermission, 
-  NotificationSettings,
-  FCMToken 
-} from '../types';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import NotificationService from '../services/notificationService';
+import {
+    NotificationData,
+    NotificationPermission,
+    NotificationSettings
+} from '../types';
 
 interface NotificationState {
   // State
@@ -68,6 +67,9 @@ export const useNotificationStore = create<NotificationState>()(
             
             // Listener'ları başlat
             notificationService.startListening();
+            
+            // Initial notification'ı kontrol et (uygulama notification ile açıldıysa)
+            await notificationService.getInitialNotification();
           }
 
           set({

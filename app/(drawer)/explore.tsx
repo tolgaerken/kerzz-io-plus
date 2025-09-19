@@ -7,26 +7,40 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Collapsible } from '@/components/ui/collapsible';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { useTheme } from '@modules/theme';
 
 export default function ExploreScreen() {
+  const { theme } = useTheme();
+
+  const styles = StyleSheet.create({
+    headerImage: {
+      color: theme.colors.textLight,
+      bottom: -90,
+      left: -35,
+      position: 'absolute',
+    },
+    titleContainer: {
+      flexDirection: 'row',
+      gap: theme.spacing.small,
+    },
+  });
+
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
+      headerBackgroundColor={{ 
+        light: theme.colors.card, 
+        dark: theme.colors.cardAlt 
+      }}
       headerImage={
         <IconSymbol
           size={310}
-          color="#808080"
+          color={theme.colors.textLight}
           name="chevron.left.forwardslash.chevron.right"
           style={styles.headerImage}
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
+        <ThemedText type="title">
           Keşfet
         </ThemedText>
       </ThemedView>
@@ -82,7 +96,7 @@ export default function ExploreScreen() {
           Bu şablon animasyonlu bir bileşen örneği içerir.{' '}
           <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> bileşeni{' '}
           el sallama animasyonu oluşturmak için güçlü{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
+          <ThemedText type="defaultSemiBold">
             react-native-reanimated
           </ThemedText>{' '}
           kütüphanesini kullanır.
@@ -99,16 +113,3 @@ export default function ExploreScreen() {
     </ParallaxScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-});

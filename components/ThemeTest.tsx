@@ -1,4 +1,4 @@
-import { ThemeProvider, useResponsive, useStyles, useTheme } from '@modules/theme';
+import { useResponsive, useStyles, useTheme } from '@modules/theme';
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -211,13 +211,9 @@ const ThemeTestContent: React.FC = () => {
   );
 };
 
-// Ana test komponenti
+// Ana test komponenti - ThemeProvider zaten _layout.tsx'te var
 const ThemeTest: React.FC = () => {
-  return (
-    <ThemeProvider defaultTheme="classic" defaultMode="light">
-      <ThemeTestContent />
-    </ThemeProvider>
-  );
+  return <ThemeTestContent />;
 };
 
 export default ThemeTest;

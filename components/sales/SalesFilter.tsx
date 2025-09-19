@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useThemeColor } from '../../hooks/use-theme-color';
+import { useStyles } from '../../modules/theme';
 import { ThemedText } from '../themed-text';
 import { ThemedView } from '../themed-view';
 
@@ -45,10 +45,7 @@ export function SalesFilter({
   const [showYearModal, setShowYearModal] = useState(false);
   const [showMonthModal, setShowMonthModal] = useState(false);
   
-  const backgroundColor = useThemeColor({}, 'background');
-  const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
-  const borderColor = useThemeColor({ light: '#E5E7EB', dark: '#374151' }, 'text');
+  const { colors, spacing, fontSize } = useStyles();
 
   const years = generateYears();
   const selectedMonthLabel = MONTHS.find(m => m.value === selectedMonth)?.label || 'Seçiniz';
@@ -56,24 +53,24 @@ export function SalesFilter({
   const styles = StyleSheet.create({
     container: {
       flexDirection: 'row',
-      padding: 16,
-      gap: 12,
-      backgroundColor,
+      padding: spacing.medium,
+      gap: spacing.medium,
+      backgroundColor: colors.background,
     },
     filterButton: {
       flex: 1,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
+      paddingVertical: spacing.medium,
+      paddingHorizontal: spacing.medium,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor,
-      backgroundColor,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
       alignItems: 'center',
     },
     filterButtonText: {
-      fontSize: 16,
+      fontSize: fontSize.medium,
       fontWeight: '500',
-      color: textColor,
+      color: colors.text,
     },
     modal: {
       flex: 1,
@@ -82,48 +79,48 @@ export function SalesFilter({
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     modalContent: {
-      backgroundColor,
+      backgroundColor: colors.background,
       borderRadius: 12,
-      padding: 20,
+      padding: spacing.large,
       width: '80%',
       maxHeight: '60%',
     },
     modalTitle: {
-      fontSize: 18,
+      fontSize: fontSize.large,
       fontWeight: 'bold',
-      marginBottom: 16,
+      marginBottom: spacing.medium,
       textAlign: 'center',
-      color: textColor,
+      color: colors.text,
     },
     optionItem: {
-      paddingVertical: 12,
-      paddingHorizontal: 16,
+      paddingVertical: spacing.medium,
+      paddingHorizontal: spacing.medium,
       borderRadius: 8,
       marginVertical: 2,
     },
     selectedOption: {
-      backgroundColor: tintColor + '20',
+      backgroundColor: colors.primary + '20',
     },
     optionText: {
-      fontSize: 16,
+      fontSize: fontSize.medium,
       textAlign: 'center',
-      color: textColor,
+      color: colors.text,
     },
     selectedOptionText: {
-      color: tintColor,
+      color: colors.primary,
       fontWeight: '600',
     },
     closeButton: {
-      marginTop: 16,
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      backgroundColor: tintColor,
+      marginTop: spacing.medium,
+      paddingVertical: spacing.medium,
+      paddingHorizontal: spacing.large,
+      backgroundColor: colors.primary,
       borderRadius: 8,
       alignSelf: 'center',
     },
     closeButtonText: {
       color: 'white',
-      fontSize: 16,
+      fontSize: fontSize.medium,
       fontWeight: '600',
     },
   });

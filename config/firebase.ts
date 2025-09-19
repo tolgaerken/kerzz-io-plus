@@ -1,5 +1,79 @@
-import { getApp, getApps } from '@react-native-firebase/app';
-import { getMessaging, requestPermission } from '@react-native-firebase/messaging';
+import { Platform } from 'react-native';
+
+// Platform-specific Firebase imports
+let firebaseApp: any = null;
+let firebaseMessaging: any = null;
+
+// Firebase fonksiyonlarını dinamik olarak yükle
+const loadFirebaseModules = async () => {
+  if (Platform.OS === 'web') {
+    try {
+      // Web için Firebase Web SDK
+      const firebaseAppModule = await import('firebase/app');
+      const firebaseMessagingModule = await import('firebase/messaging');
+      
+      // Firebase Web config - bu değerleri Firebase Console'dan alın
+      const firebaseConfig = {
+        // Web için Firebase config buraya gelecek
+        // Şimdilik boş bırakıyoruz, çünkü config dosyası yok
+      };
+
+      const initializeWebFirebase = async () => {
+        try {
+          // Messaging desteklenip desteklenmediğini kontrol et
+          const messagingSupported = await firebaseMessagingModule.isSupported();
+          if (!messagingSupported) {
+            console.log('📱 Web Messaging desteklenmiyor (HTTP veya localhost olabilir)');
+            return false;
+          }
+
+          // Firebase App'i başlat
+          const apps = firebaseAppModule.getApps();
+          if (apps.length === 0) {
+            firebaseApp = firebaseAppModule.initializeApp(firebaseConfig);
+            console.log('✅ Firebase Web App başlatıldı');
+          } else {
+            firebaseApp = firebaseAppModule.getApp();
+            console.log('✅ Firebase Web App zaten mevcut');
+          }
+
+          // Messaging'i başlat
+          firebaseMessaging = firebaseMessagingModule.getMessaging(firebaseApp);
+          console.log('📨 Firebase Web Messaging başlatıldı');
+          
+          return true;
+        } catch (error) {
+          console.error('❌ Firebase Web başlatma hatası:', error);
+          return false;
+        }
+      };
+
+      firebaseApp = { initializeWebFirebase };
+    } catch (error) {
+      console.warn('⚠️ Firebase Web SDK yüklenemedi:', error);
+    }
+  } else {
+    try {
+      // React Native için Firebase
+      const firebaseAppModule = await import('@react-native-firebase/app');
+      const firebaseMessagingModule = await import('@react-native-firebase/messaging');
+      
+      firebaseApp = { 
+        getApp: firebaseAppModule.getApp, 
+        getApps: firebaseAppModule.getApps 
+      };
+      firebaseMessaging = { 
+        getMessaging: firebaseMessagingModule.getMessaging, 
+        requestPermission: firebaseMessagingModule.requestPermission 
+      };
+    } catch (error) {
+      console.warn('⚠️ React Native Firebase yüklenemedi:', error);
+    }
+  }
+};
+
+// Firebase modüllerini başlat
+loadFirebaseModules();
 
 /**
  * Firebase App'i başlat
@@ -7,33 +81,46 @@ import { getMessaging, requestPermission } from '@react-native-firebase/messagin
  */
 export const initializeFirebase = async (): Promise<boolean> => {
   try {
-    console.log('🔍 Firebase App durumu kontrol ediliyor...');
+    console.log(`🔍 Firebase App durumu kontrol ediliyor... (${Platform.OS})`);
     
+    // Web platformu için
+    if (Platform.OS === 'web') {
+      if (firebaseApp && firebaseApp.initializeWebFirebase) {
+        return await firebaseApp.initializeWebFirebase();
+      } else {
+        console.log('⚠️ Web platformunda Firebase config eksik - şimdilik atlanıyor');
+        return true; // Web'de Firebase olmadan da çalışabilir
+      }
+    }
+    
+    // React Native platformları için
+    if (!firebaseApp || !firebaseMessaging) {
+      console.error('❌ Firebase modülleri yüklenemedi');
+      return false;
+    }
+
     // Expo + React Native Firebase için özel başlatma
-    // Önce mevcut durumu kontrol et
-    const apps = getApps();
+    const apps = firebaseApp.getApps();
     console.log('📱 Mevcut Firebase Apps:', apps.length);
     
     if (apps.length > 0) {
       console.log('✅ Firebase App zaten başlatılmış');
-      console.log('📋 App isimleri:', apps.map(app => app.name));
+      console.log('📋 App isimleri:', apps.map((app: any) => app.name));
       return true;
     }
     
     // Firebase App'i manuel olarak başlatmaya çalış
     console.log('⚠️ Firebase App bulunamadı, manuel başlatma deneniyor...');
     
-    // Expo'da React Native Firebase otomatik başlatılır
-    // Messaging modülünü import etmek yeterli olmalı
     try {
       // Messaging instance'ı al - bu Firebase'i otomatik başlatmalı
-      const messagingInstance = getMessaging();
+      const messagingInstance = firebaseMessaging.getMessaging();
       console.log('📨 Messaging instance oluşturuldu:', !!messagingInstance);
       
       // Kısa bir bekleme sonrası tekrar kontrol et
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const appsAfterMessaging = getApps();
+      const appsAfterMessaging = firebaseApp.getApps();
       console.log('📱 Başlatma sonrası Firebase Apps:', appsAfterMessaging.length);
       
       if (appsAfterMessaging.length > 0) {
@@ -47,10 +134,10 @@ export const initializeFirebase = async (): Promise<boolean> => {
     // Son çare: Permission request ile başlatmaya çalış
     try {
       console.log('🔄 Permission request ile başlatma deneniyor...');
-      const messagingInstance = getMessaging();
-      await requestPermission(messagingInstance);
+      const messagingInstance = firebaseMessaging.getMessaging();
+      await firebaseMessaging.requestPermission(messagingInstance);
       
-      const appsAfterPermission = getApps();
+      const appsAfterPermission = firebaseApp.getApps();
       if (appsAfterPermission.length > 0) {
         console.log('✅ Firebase App permission request ile başlatıldı');
         return true;
@@ -72,8 +159,16 @@ export const initializeFirebase = async (): Promise<boolean> => {
  */
 export const isFirebaseInitialized = (): boolean => {
   try {
-    const apps = getApps();
-    return apps.length > 0;
+    if (Platform.OS === 'web') {
+      // Web'de Firebase config eksik olabilir, bu durumda true döndür
+      return true;
+    }
+    
+    if (firebaseApp && firebaseApp.getApps) {
+      const apps = firebaseApp.getApps();
+      return apps.length > 0;
+    }
+    return false;
   } catch (error) {
     console.error('❌ Firebase durum kontrolü hatası:', error);
     return false;
@@ -83,7 +178,14 @@ export const isFirebaseInitialized = (): boolean => {
 // Default app'i export et (v22 uyumlu)
 export const getDefaultApp = () => {
   try {
-    return getApp();
+    if (Platform.OS === 'web') {
+      return firebaseApp;
+    }
+    
+    if (firebaseApp && firebaseApp.getApp) {
+      return firebaseApp.getApp();
+    }
+    return null;
   } catch (error) {
     console.error('❌ Default app alınamadı:', error);
     return null;

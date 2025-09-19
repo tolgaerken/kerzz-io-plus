@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useThemeColor } from '../../hooks/use-theme-color';
+import { useStyles } from '../../modules/theme';
 import { ThemedText } from '../themed-text';
 import { ThemedView } from '../themed-view';
 
@@ -16,31 +16,27 @@ interface SalesStatsProps {
 }
 
 export function SalesStats({ stats }: SalesStatsProps) {
-  const backgroundColor = useThemeColor({}, 'background');
-  const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
-  const cardBackgroundColor = useThemeColor({ light: '#F9FAFB', dark: '#1F2937' }, 'background');
-  const borderColor = useThemeColor({ light: '#E5E7EB', dark: '#374151' }, 'text');
+  const { colors, spacing, fontSize } = useStyles();
 
   const styles = StyleSheet.create({
     container: {
-      backgroundColor,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.medium,
+      paddingVertical: spacing.medium,
     },
     statsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 12,
+      gap: spacing.medium,
     },
     statCard: {
-      backgroundColor: cardBackgroundColor,
+      backgroundColor: colors.card,
       borderRadius: 12,
-      padding: 16,
+      padding: spacing.medium,
       flex: 1,
       minWidth: '45%',
       borderWidth: 1,
-      borderColor: borderColor + '40',
+      borderColor: colors.border + '40',
       shadowColor: '#000',
       shadowOffset: {
         width: 0,
@@ -51,31 +47,40 @@ export function SalesStats({ stats }: SalesStatsProps) {
       elevation: 3,
     },
     statValue: {
-      fontSize: 20,
+      fontSize: fontSize.xlarge,
       fontWeight: 'bold',
-      color: tintColor,
+      color: colors.primary,
       marginBottom: 4,
     },
     statLabel: {
-      fontSize: 12,
-      color: textColor + '80',
+      fontSize: fontSize.small,
+      color: colors.textLight,
       fontWeight: '500',
     },
     profitValue: {
-      color: '#10B981',
+      color: colors.success,
     },
     approvedValue: {
-      color: '#10B981',
+      color: colors.success,
     },
     pendingValue: {
-      color: '#F59E0B',
+      color: colors.warning,
     },
   });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('tr-TR', {
+  const formatCurrency = (amount: number, currency: string = 'tl') => {
+    const currencyMap: { [key: string]: string } = {
+      'tl': 'TRY',
+      'usd': 'USD',
+      'eur': 'EUR'
+    };
+    
+    const currencyCode = currencyMap[currency.toLowerCase()] || 'TRY';
+    const locale = currencyCode === 'TRY' ? 'tr-TR' : 'en-US';
+    
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency: 'TRY',
+      currency: currencyCode,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -103,7 +108,7 @@ export function SalesStats({ stats }: SalesStatsProps) {
 
         <View style={styles.statCard}>
           <ThemedText style={styles.statValue}>
-            {formatCurrency(stats.totalAmount)}
+            {formatCurrency(stats.totalAmount, 'tl')}
           </ThemedText>
           <ThemedText style={styles.statLabel}>
             Toplam Tutar
@@ -112,7 +117,7 @@ export function SalesStats({ stats }: SalesStatsProps) {
 
         <View style={styles.statCard}>
           <ThemedText style={[styles.statValue, styles.profitValue]}>
-            {formatCurrency(stats.totalProfit)}
+            {formatCurrency(stats.totalProfit, 'tl')}
           </ThemedText>
           <ThemedText style={styles.statLabel}>
             Toplam Kar
@@ -121,7 +126,7 @@ export function SalesStats({ stats }: SalesStatsProps) {
 
         <View style={styles.statCard}>
           <ThemedText style={styles.statValue}>
-            {formatCurrency(stats.averageAmount)}
+            {formatCurrency(stats.averageAmount, 'tl')}
           </ThemedText>
           <ThemedText style={styles.statLabel}>
             Ortalama Tutar

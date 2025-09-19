@@ -26,6 +26,10 @@ export interface TSale extends BaseModel {
   approved_userId: string
   approved_userName: string
   approve_time: Date
+  invoiceApproved: boolean
+  invoiceApprovedAt: Date
+  invoiceApprovedBy: string
+  invoiceApprovedByName: string
 
   products: TSaleRow[]
   licances: TSaleRow[]
@@ -214,10 +218,7 @@ export interface TSaleLog {
   desc: string
 }
 
-
 export interface TOpportunity {
-    
-
   id: string
   no: number
   date: Date
@@ -233,19 +234,20 @@ export interface TOpportunity {
   type: string
   userId: string
   sellerId: string
-  logs: TOpportunityLog[],
-  requestType: string,
-  heat: string,
-  customerType: string,
-  cityId: number,
-  city: string,
-  townId: number,
-  town: string,
-  request: string,
-  channel: string,
-  property: string[],
+  logs: TOpportunityLog[]
+  requestType: string
+  heat: string
+  customerType: string
   
+  // Lokasyon bilgileri
+  cityId: string // İl ID'si (helpers.cities_tr koleksiyonundan)
+  city: string // İl adı (görüntüleme için)
+  townId: string // İlçe ID'si (helpers.counties_tr koleksiyonundan)
+  town: string // İlçe adı (görüntüleme için)
   
+  request: string
+  channel: string
+  property: string[]
 }
 
 export interface TOpportunityLog {
@@ -254,4 +256,115 @@ export interface TOpportunityLog {
   text: string
   userId: string
   userName: string
+}
+
+// User Management Types
+export interface TUserApp {
+  _id?: {
+    $oid: string
+  }
+  id: string
+  app_id: string
+  editDate: Date
+  editUser: string
+  user_id: string
+  user_name: string
+}
+
+export interface TUser {
+  _id?: {
+    $oid: string
+  }
+  id: string
+  name: string
+  phone: string
+  resetCode?: string
+  password?: string
+  mail: string
+  dateOfBirth?: Date
+  gender: 'male' | 'female' | 'none'
+  image?: string
+  permissions?: {
+    push: boolean
+    sms: boolean
+    email: boolean
+    phone: boolean
+  }
+  editDate?: Date
+  editUser?: string
+  gsmOTP?: string
+  userLanguage?: string
+  userRegion?: string
+  legalNotePermissions?: {
+    privacyPolicy: boolean
+    clarificartion: boolean
+    expressConsent: boolean
+    membershipAgreement: boolean
+  }
+  lastLoginDate?: Date
+  lastActionDate?: Date
+}
+
+export interface TUserProfile {
+  _id?: {
+    $oid: string
+  }
+  id: string
+  companyCode: string
+  createdAt: Date
+  departmentId: string
+  editDate: Date
+  editUser: string
+  startDate: Date
+  status: 'active' | 'inactive'
+  updatedAt: Date
+  userId: string
+  creatorId: string
+  endDate?: Date
+  profilePhotoUrl?: string | null
+  biography?: string
+}
+
+// Combined User Data
+export interface TCombinedUser {
+  id: string
+  name: string
+  phone: string
+  mail: string
+  departmentId?: string
+  status?: 'active' | 'inactive'
+  profilePhotoUrl?: string | null
+  biography?: string
+  userLanguage?: string
+  userRegion?: string
+  lastLoginDate?: Date
+  lastActionDate?: Date
+  companyCode?: string
+  startDate?: Date
+  endDate?: Date
+}
+
+// Salesperson specific type
+export interface TSalesperson extends TCombinedUser {
+  departmentId: string // Required for salespeople
+}
+
+// City and County Types
+export interface TCity {
+  id: string
+  name: string
+  plateCode: number
+  phoneCode: string
+  region: string
+  createdAt?: Date
+  updatedAt?: Date
+}
+
+export interface TCounty {
+  id: string
+  name: string
+  cityId: string
+  cityName?: string
+  createdAt?: Date
+  updatedAt?: Date
 }

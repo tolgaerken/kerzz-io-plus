@@ -53,7 +53,12 @@
           "sounds": []
         }
       ],
-      "@react-native-firebase/app"
+      [
+        "@react-native-firebase/app",
+        {
+          "platforms": ["ios", "android"]
+        }
+      ]
     ],
     "notification": {
       "icon": "./assets/images/icon.png",
