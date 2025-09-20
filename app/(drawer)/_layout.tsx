@@ -61,6 +61,15 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="licenses"
+          options={{
+            title: 'Lisanslar',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="key.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="profile"
           options={{
             title: 'Profil',
@@ -89,6 +98,13 @@ export default function DrawerLayout() {
           name="opportunity-detail"
           options={{
             title: 'Fırsat Detayı',
+            drawerItemStyle: { display: 'none' }, // Hide from drawer menu
+          }}
+        />
+        <Drawer.Screen
+          name="license-detail"
+          options={{
+            title: 'Lisans Detayı',
             drawerItemStyle: { display: 'none' }, // Hide from drawer menu
           }}
         />

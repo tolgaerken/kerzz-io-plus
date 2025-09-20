@@ -7,6 +7,7 @@ export { useCitiesQuery } from './hooks/useCitiesQuery';
 export { useCountiesQuery } from './hooks/useCountiesQuery';
 export { useOpportunitiesQuery } from './hooks/useOpportunitiesQuery';
 export { useIsSalesperson, useSalespeople, useSalespeopleQuery } from './hooks/useSalespeopleQuery';
+export { useLicenseQuery } from './hooks/useLicenseQuery';
 export { useSocket } from './hooks/useSocket';
 
 // Services
