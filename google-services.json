@@ -7,15 +7,15 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:410404917668:android:8de6497705198a8e253131",
+        "mobilesdk_app_id": "1:410404917668:android:0f19b6e35a8127c9253131",
         "android_client_info": {
-          "package_name": "com.kerzz.kerzz-io"
+          "package_name": "com.kerzz.kerzz_io"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBBPvksSwsTZ7oCLO_cXctbXUF2zwktSGU"
+          "current_key": "AIzaSyCoIxCb9opAn63Z1_QipOfO9chC5Dg8DpA"
         }
       ],
       "services": {

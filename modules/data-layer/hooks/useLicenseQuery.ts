@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { TLicense, LicenseSearchParams } from '../../../types/license.types';
+import { LicenseSearchParams, TLicense } from '../../../types/license.types';
 import { useAuthStore } from '../../auth';
 import { useHttpClient } from '../services';
 import { useBaseQuery } from './useBaseQuery';
@@ -121,7 +121,7 @@ export function useLicenseQuery() {
 
   // Lisans detayı için tam veri çekme
   const useLicenseDetail = (licenseId: string) => {
-    return baseQuery.useItem(licenseId, {
+    return baseQuery.useOne(licenseId, {
       enabled: !!licenseId,
     });
   };

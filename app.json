@@ -22,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.kerzz.kerzz-io",
+      "package": "com.kerzz.kerzz_io",
       "googleServicesFile": "./google-services.json"
     },
     "web": {

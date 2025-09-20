@@ -5,9 +5,10 @@ export { useBaseMongo } from './hooks/useBaseMongo';
 export { useBaseQuery } from './hooks/useBaseQuery';
 export { useCitiesQuery } from './hooks/useCitiesQuery';
 export { useCountiesQuery } from './hooks/useCountiesQuery';
+export { useCustomerQuery } from './hooks/useCustomerQuery';
+export { useLicenseQuery } from './hooks/useLicenseQuery';
 export { useOpportunitiesQuery } from './hooks/useOpportunitiesQuery';
 export { useIsSalesperson, useSalespeople, useSalespeopleQuery } from './hooks/useSalespeopleQuery';
-export { useLicenseQuery } from './hooks/useLicenseQuery';
 export { useSocket } from './hooks/useSocket';
 
 // Services

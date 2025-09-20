@@ -29,9 +29,7 @@ export const LicenseToolbar = React.memo(function LicenseToolbar({
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      marginHorizontal: spacing.medium,
       marginTop: spacing.small,
-      marginBottom: spacing.small / 2,
       paddingVertical: spacing.medium,
       paddingHorizontal: spacing.medium,
       backgroundColor: colors.card,
@@ -47,7 +45,7 @@ export const LicenseToolbar = React.memo(function LicenseToolbar({
       shadowOpacity: 0.1,
       shadowRadius: 3.84,
       elevation: 5,
-      height: 80, // Sabit yükseklik
+      height: 110,
     },
     toggleButton: {
       flexDirection: 'row',

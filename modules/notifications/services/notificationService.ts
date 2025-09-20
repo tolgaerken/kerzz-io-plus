@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { isFirebaseInitialized } from '../../../config/firebase';
 import {
-  FCMToken,
-  NotificationPermission,
-  NotificationSettings
+    FCMToken,
+    NotificationPermission,
+    NotificationSettings
 } from '../types';
 
 // Platform-specific imports
@@ -102,6 +102,8 @@ class NotificationService {
    */
   async requestPermissions(): Promise<NotificationPermission> {
     try {
+      console.log('📱 Notification izinleri isteniyor...', { platform: Platform.OS });
+
       // Web platformu için
       if (Platform.OS === 'web') {
         // Web'de Notification API'sini kullan
@@ -111,19 +113,24 @@ class NotificationService {
         }
 
         if (Notification.permission === 'granted') {
+          console.log('✅ Web notification izni zaten verilmiş');
           return { status: 'granted', canAskAgain: true };
         }
 
         if (Notification.permission === 'denied') {
+          console.log('❌ Web notification izni reddedilmiş');
           return { status: 'denied', canAskAgain: false };
         }
 
         // İzin iste
+        console.log('🔔 Web notification izni isteniyor...');
         const permission = await Notification.requestPermission();
-        return {
+        const result: NotificationPermission = {
           status: permission === 'granted' ? 'granted' : 'denied',
           canAskAgain: permission !== 'denied'
         };
+        console.log('📱 Web notification izin sonucu:', result);
+        return result;
       }
 
       // React Native platformları için
@@ -137,23 +144,89 @@ class NotificationService {
         return { status: 'denied', canAskAgain: false };
       }
 
-      // FCM authorization durumunu kontrol et
+      // iOS ve Android için platform-specific izin isteme
+      if (Platform.OS === 'ios') {
+        console.log('🍎 iOS notification izni isteniyor...');
+        
+        // iOS için özel izin isteme
+        const authStatus = await notificationFunctions.requestPermission(this.messaging, {
+          alert: true,
+          badge: true,
+          sound: true,
+          announcement: false,
+          carPlay: false,
+          criticalAlert: false,
+          provisional: false,
+        });
+        
+        const enabled =
+          authStatus === notificationFunctions.AuthorizationStatus.AUTHORIZED ||
+          authStatus === notificationFunctions.AuthorizationStatus.PROVISIONAL;
+
+        const result: NotificationPermission = {
+          status: enabled ? 'granted' : 'denied',
+          canAskAgain: authStatus === notificationFunctions.AuthorizationStatus.NOT_DETERMINED
+        };
+        
+        console.log('📱 iOS notification izin sonucu:', { authStatus, result });
+        return result;
+      } else if (Platform.OS === 'android') {
+        console.log('🤖 Android notification izni isteniyor...');
+        console.log('🔧 Android Firebase messaging durumu:', {
+          messagingInstance: !!this.messaging,
+          requestPermissionFunction: !!notificationFunctions.requestPermission,
+          AuthorizationStatus: !!notificationFunctions.AuthorizationStatus
+        });
+        
+        // Android için izin isteme
+        const authStatus = await notificationFunctions.requestPermission(this.messaging);
+        console.log('🔍 Android raw authStatus:', authStatus);
+        console.log('🔍 AuthorizationStatus enum:', {
+          AUTHORIZED: notificationFunctions.AuthorizationStatus.AUTHORIZED,
+          PROVISIONAL: notificationFunctions.AuthorizationStatus.PROVISIONAL,
+          NOT_DETERMINED: notificationFunctions.AuthorizationStatus.NOT_DETERMINED,
+          DENIED: notificationFunctions.AuthorizationStatus.DENIED
+        });
+        
+        const enabled =
+          authStatus === notificationFunctions.AuthorizationStatus.AUTHORIZED ||
+          authStatus === notificationFunctions.AuthorizationStatus.PROVISIONAL;
+
+        const result: NotificationPermission = {
+          status: enabled ? 'granted' : 'denied',
+          canAskAgain: authStatus === notificationFunctions.AuthorizationStatus.NOT_DETERMINED
+        };
+        
+        console.log('📱 Android notification izin sonucu:', { 
+          authStatus, 
+          enabled,
+          result,
+          statusComparison: {
+            isAuthorized: authStatus === notificationFunctions.AuthorizationStatus.AUTHORIZED,
+            isProvisional: authStatus === notificationFunctions.AuthorizationStatus.PROVISIONAL,
+            isNotDetermined: authStatus === notificationFunctions.AuthorizationStatus.NOT_DETERMINED,
+            isDenied: authStatus === notificationFunctions.AuthorizationStatus.DENIED
+          }
+        });
+        return result;
+      }
+
+      // Diğer platformlar için genel izin isteme
       const authStatus = await notificationFunctions.requestPermission(this.messaging);
       
       const enabled =
         authStatus === notificationFunctions.AuthorizationStatus.AUTHORIZED ||
         authStatus === notificationFunctions.AuthorizationStatus.PROVISIONAL;
 
-      if (!enabled) {
-        return { 
-          status: 'denied', 
-          canAskAgain: authStatus === notificationFunctions.AuthorizationStatus.NOT_DETERMINED 
-        };
-      }
-
-      return { status: 'granted', canAskAgain: true };
+      const result: NotificationPermission = {
+        status: enabled ? 'granted' : 'denied',
+        canAskAgain: authStatus === notificationFunctions.AuthorizationStatus.NOT_DETERMINED
+      };
+      
+      console.log('📱 Genel notification izin sonucu:', { authStatus, result });
+      return result;
     } catch (error) {
-      console.error('FCM permission request hatası:', error);
+      console.error('❌ FCM permission request hatası:', error);
       return { status: 'denied', canAskAgain: false };
     }
   }
@@ -192,8 +265,9 @@ class NotificationService {
       }
 
       const permission = await this.requestPermissions();
+      console.log('🔍 Token alma - permission durumu:', permission);
       if (permission.status !== 'granted') {
-        console.warn('FCM notification izni verilmedi');
+        console.warn('⚠️ FCM notification izni verilmedi, token alınamıyor');
         return null;
       }
 
@@ -202,7 +276,13 @@ class NotificationService {
         return null;
       }
 
+      console.log('📱 FCM token alınıyor...', { platform: Platform.OS });
       const token = await notificationFunctions.getToken(this.messaging);
+      console.log('📱 FCM token alındı:', { 
+        hasToken: !!token, 
+        tokenLength: token?.length || 0,
+        tokenPreview: token ? token.substring(0, 20) + '...' : null
+      });
 
       this.currentToken = token;
       await this.saveTokenToStorage(token);
@@ -295,6 +375,7 @@ class NotificationService {
     // Foreground message listener
     this.messageListener = notificationFunctions.onMessage(this.messaging, async (remoteMessage: any) => {
       console.log('🔔 FCM message alındı (foreground):', remoteMessage);
+      console.log('📱 Platform:', Platform.OS);
       console.log('📱 Bildirim Detayları:', {
         title: remoteMessage.notification?.title,
         body: remoteMessage.notification?.body,
@@ -303,7 +384,10 @@ class NotificationService {
         messageId: remoteMessage.messageId,
         sentTime: remoteMessage.sentTime,
         ttl: remoteMessage.ttl,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        hasNotification: !!remoteMessage.notification,
+        hasData: !!remoteMessage.data,
+        platform: Platform.OS
       });
       this.handleForegroundMessage(remoteMessage);
     });
@@ -1196,6 +1280,12 @@ class NotificationService {
       case 'sale':
         await this.handleSaleNotification(fullDocument, isAppOpen);
         break;
+      case 'opportunity':
+        await this.handleOpportunityNotification(fullDocument, isAppOpen);
+        break;
+      case 'bank-transaction':
+        await this.handleBankTransactionNotification(fullDocument, isAppOpen);
+        break;
       default:
         console.log(`⚠️ Bilinmeyen module: ${module}`);
         break;
@@ -1230,19 +1320,124 @@ class NotificationService {
   }
 
   /**
+   * Opportunity module notification handler
+   */
+  private async handleOpportunityNotification(opportunityData: any, isAppOpen: boolean): Promise<void> {
+    try {
+      console.log('🎯 Opportunity notification handler:', {
+        opportunityNo: opportunityData?.no,
+        isAppOpen
+      });
+
+      if (!opportunityData?.no && !opportunityData?.id && !opportunityData?.company) {
+        console.error('❌ Opportunity data geçersiz (no/id/company yok)');
+        return;
+      }
+
+      // Öncelik: no → id → company
+      const searchQuery = opportunityData?.no?.toString() || opportunityData?.id || opportunityData?.company;
+
+      if (isAppOpen) {
+        await this.showOpportunityNavigationDialog(searchQuery, opportunityData);
+      } else {
+        await this.navigateToOpportunity(searchQuery);
+      }
+    } catch (error) {
+      console.error('❌ Opportunity notification handler hatası:', error);
+    }
+  }
+
+  /**
+   * Fırsat yönlendirme onay dialogu (uygulama açıkken)
+   */
+  private async showOpportunityNavigationDialog(searchQuery: string, opportunityData?: any): Promise<void> {
+    return new Promise(async (resolve) => {
+      try {
+        const title = 'Fırsat Bildirimi';
+        const bodyLines: string[] = [];
+        if (opportunityData?.no) bodyLines.push(`Fırsat No: ${opportunityData.no}`);
+        if (opportunityData?.company) bodyLines.push(`Şirket: ${opportunityData.company}`);
+        const message = `${bodyLines.join('\n')}${bodyLines.length ? '\n\n' : ''}Bu fırsatı görüntülemek istiyor musunuz?`;
+
+        if (Platform.OS === 'web') {
+          const canConfirm = typeof confirm === 'function';
+          const userConfirmed = canConfirm ? confirm(`${title}\n\n${message}`) : true;
+          if (userConfirmed) {
+            console.log('📱 Kullanıcı fırsat yönlendirmesini onayladı (web)');
+            await this.navigateToOpportunity(searchQuery);
+          } else {
+            console.log('📱 Kullanıcı fırsat yönlendirmesini iptal etti (web)');
+          }
+          resolve();
+        } else {
+          try {
+            Alert.alert(
+              title,
+              message,
+              [
+                {
+                  text: 'İptal',
+                  style: 'cancel',
+                  onPress: () => {
+                    console.log('📱 Kullanıcı fırsat yönlendirmesini iptal etti');
+                    resolve();
+                  }
+                },
+                {
+                  text: 'Görüntüle',
+                  onPress: async () => {
+                    console.log('📱 Kullanıcı fırsat yönlendirmesini onayladı');
+                    await this.navigateToOpportunity(searchQuery);
+                    resolve();
+                  }
+                }
+              ]
+            );
+          } catch (importError) {
+            console.error('❌ Alert import hatası:', importError);
+            await this.navigateToOpportunity(searchQuery);
+            resolve();
+          }
+        }
+      } catch (error) {
+        console.error('❌ Fırsat dialog gösterme hatası:', error);
+        await this.navigateToOpportunity(searchQuery);
+        resolve();
+      }
+    });
+  }
+
+  /**
+   * Fırsata yönlendirme (Opportunities ekranına git ve arama yap)
+   */
+  private async navigateToOpportunity(searchQuery: string): Promise<void> {
+    try {
+      console.log('🧭 Fırsata yönlendiriliyor, arama:', searchQuery);
+      const { router } = await import('expo-router');
+      router.push({
+        pathname: '/(drawer)/opportunities',
+        params: {
+          searchQuery: searchQuery?.toString?.() || String(searchQuery)
+        }
+      });
+      console.log('✅ Fırsatlar sayfasına yönlendirildi');
+    } catch (error) {
+      console.error('❌ Fırsat yönlendirme hatası:', error);
+    }
+  }
+
+  /**
    * Satış yönlendirme onay dialogu (uygulama açıkken)
    */
   private async showSaleNavigationDialog(saleData: any): Promise<void> {
     return new Promise(async (resolve) => {
       try {
-        // Platform kontrolü yap
-        const { Platform } = await import('react-native');
-        
         if (Platform.OS === 'web') {
           // Web'de confirm kullan
-          const userConfirmed = confirm(
+          const canConfirm = typeof confirm === 'function';
+          const userConfirmed = canConfirm ? confirm(
             `Satış Bildirimi\n\nSatış No: ${saleData.no}\n\nBu satışı görüntülemek istiyor musunuz?`
-          );
+          ) : true;
           
           if (userConfirmed) {
             console.log('📱 Kullanıcı satış yönlendirmesini onayladı (web)');
@@ -1254,8 +1449,6 @@ class NotificationService {
         } else {
           // React Native Alert'i güvenli şekilde import et
           try {
-            const { Alert } = await import('react-native');
-            
             Alert.alert(
               'Satış Bildirimi',
               `Satış No: ${saleData.no}\n\nBu satışı görüntülemek istiyor musunuz?`,
@@ -1315,6 +1508,113 @@ class NotificationService {
       console.log('✅ Satış sayfasına yönlendirildi');
     } catch (error) {
       console.error('❌ Satış yönlendirme hatası:', error);
+    }
+  }
+
+  /**
+   * Banka hareketi module notification handler
+   */
+  private async handleBankTransactionNotification(transactionData: any, isAppOpen: boolean): Promise<void> {
+    try {
+      console.log('🏦 Banka hareketi notification handler:', {
+        id: transactionData?.id || transactionData?._id || transactionData?.no || transactionData?.transactionNo,
+        isAppOpen
+      });
+
+      if (!transactionData || Object.keys(transactionData).length === 0) {
+        console.error('❌ Banka hareketi verisi geçersiz');
+        return;
+      }
+
+      if (isAppOpen) {
+        await this.showBankTransactionNavigationDialog(transactionData);
+      } else {
+        await this.navigateToBankTransaction(transactionData);
+      }
+    } catch (error) {
+      console.error('❌ Banka hareketi notification handler hatası:', error);
+    }
+  }
+
+  /**
+   * Banka hareketi yönlendirme onay dialogu (uygulama açıkken)
+   */
+  private async showBankTransactionNavigationDialog(transactionData: any): Promise<void> {
+    return new Promise(async (resolve) => {
+      try {
+        const title = 'Banka Hareketi Bildirimi';
+        const lines: string[] = [];
+        const txNo = transactionData?.transactionNo || transactionData?.no || transactionData?.id || transactionData?._id;
+        if (txNo) lines.push(`Hareket No: ${txNo}`);
+        if (transactionData?.amount) lines.push(`Tutar: ${transactionData.amount} ${transactionData?.currency || ''}`.trim());
+        if (transactionData?.company) lines.push(`Şirket: ${transactionData.company}`);
+        if (transactionData?.opportunityNo) lines.push(`Fırsat No: ${transactionData.opportunityNo}`);
+        const message = `${lines.join('\n')}${lines.length ? '\n\n' : ''}Bu banka hareketini görüntülemek istiyor musunuz?`;
+
+        if (Platform.OS === 'web') {
+          const canConfirm = typeof confirm === 'function';
+          const userConfirmed = canConfirm ? confirm(`${title}\n\n${message}`) : true;
+          if (userConfirmed) {
+            console.log('📱 Kullanıcı banka hareketi yönlendirmesini onayladı (web)');
+            await this.navigateToBankTransaction(transactionData);
+          } else {
+            console.log('📱 Kullanıcı banka hareketi yönlendirmesini iptal etti (web)');
+          }
+          resolve();
+        } else {
+          try {
+            Alert.alert(
+              title,
+              message,
+              [
+                {
+                  text: 'İptal',
+                  style: 'cancel',
+                  onPress: () => {
+                    console.log('📱 Kullanıcı banka hareketi yönlendirmesini iptal etti');
+                    resolve();
+                  }
+                },
+                {
+                  text: 'Görüntüle',
+                  onPress: async () => {
+                    console.log('📱 Kullanıcı banka hareketi yönlendirmesini onayladı');
+                    await this.navigateToBankTransaction(transactionData);
+                    resolve();
+                  }
+                }
+              ]
+            );
+          } catch (importError) {
+            console.error('❌ Alert import hatası:', importError);
+            await this.navigateToBankTransaction(transactionData);
+            resolve();
+          }
+        }
+      } catch (error) {
+        console.error('❌ Banka hareketi dialog gösterme hatası:', error);
+        await this.navigateToBankTransaction(transactionData);
+        resolve();
+      }
+    });
+  }
+
+  /**
+   * Banka hareketine yönlendirme (mock detay ekranına git)
+   */
+  private async navigateToBankTransaction(transactionData: any): Promise<void> {
+    try {
+      console.log('🧭 Banka hareketine yönlendiriliyor');
+      const { router } = await import('expo-router');
+      router.push({
+        pathname: '/(drawer)/bank-transaction-detail',
+        params: {
+          transactionData: JSON.stringify(transactionData)
+        }
+      });
+      console.log('✅ Banka hareketi detay ekranına yönlendirildi');
+    } catch (error) {
+      console.error('❌ Banka hareketi yönlendirme hatası:', error);
     }
   }
 
@@ -1380,6 +1680,56 @@ class NotificationService {
     }
 
     await this.handleNotification(testNotification, isAppOpen);
+  }
+
+  /**
+   * Android notification debug bilgilerini göster
+   */
+  async debugAndroidNotifications(): Promise<void> {
+    if (Platform.OS !== 'android') {
+      console.log('⚠️ Bu fonksiyon sadece Android için geçerlidir');
+      return;
+    }
+
+    console.log('🤖 Android Notification Debug Başlatılıyor...');
+    console.log('=====================================');
+    
+    // Firebase durumu
+    console.log('🔥 Firebase durumu:', {
+      isInitialized: isFirebaseInitialized(),
+      hasMessaging: !!this.messaging,
+      hasRequestPermission: !!notificationFunctions.requestPermission,
+      hasGetToken: !!notificationFunctions.getToken,
+      hasOnMessage: !!notificationFunctions.onMessage
+    });
+
+    // İzin durumu
+    try {
+      const permission = await this.requestPermissions();
+      console.log('📱 İzin durumu:', permission);
+    } catch (error) {
+      console.error('❌ İzin kontrolü hatası:', error);
+    }
+
+    // Token durumu
+    try {
+      const token = await this.getToken();
+      console.log('🔑 Token durumu:', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+        tokenPreview: token ? token.substring(0, 30) + '...' : null
+      });
+    } catch (error) {
+      console.error('❌ Token alma hatası:', error);
+    }
+
+    // Listener durumu
+    console.log('👂 Listener durumu:', {
+      hasMessageListener: !!this.messageListener,
+      hasTokenRefreshListener: !!this.tokenRefreshListener
+    });
+
+    console.log('=====================================');
   }
 
   /**

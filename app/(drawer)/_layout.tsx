@@ -70,6 +70,15 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="customers"
+          options={{
+            title: 'Müşteriler',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="person.2.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="profile"
           options={{
             title: 'Profil',
@@ -105,6 +114,13 @@ export default function DrawerLayout() {
           name="license-detail"
           options={{
             title: 'Lisans Detayı',
+            drawerItemStyle: { display: 'none' }, // Hide from drawer menu
+          }}
+        />
+        <Drawer.Screen
+          name="bank-transaction-detail"
+          options={{
+            title: 'Banka Hareketi',
             drawerItemStyle: { display: 'none' }, // Hide from drawer menu
           }}
         />

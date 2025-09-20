@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLicenseQuery } from '../../modules/data-layer/hooks/useLicenseQuery';
 import { useStyles } from '../../modules/theme';
@@ -17,19 +17,19 @@ interface LicenseScreenProps {
 
 export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
   // Initial search query'nin sadece bir kez çalışması için ref
-  const hasProcessedInitialQuery = useRef(false);
+  const hasProcessedInitialQuery = React.useRef(false);
   
   // Arama state'leri
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<TLicense[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<TLicense[]>([]);
+  const [isSearching, setIsSearching] = React.useState(false);
+  const [showSearchResults, setShowSearchResults] = React.useState(false);
   
   // Filter state'leri
-  const [searchParams, setSearchParams] = useState<LicenseSearchParams>({});
+  const [searchParams, setSearchParams] = React.useState<LicenseSearchParams>({});
   
   // Loading state'leri - hangi lisansın hangi butonu loading
-  const [loadingStates, setLoadingStates] = useState<{
+  const [loadingStates, setLoadingStates] = React.useState<{
     blockToggling: Set<string>;
     activeToggling: Set<string>;
   }>({
@@ -56,7 +56,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
   const toggleActiveMutation = licenseQuery.useToggleActive();
 
   // Loading state helper fonksiyonları
-  const setBlockToggleLoading = useCallback((licenseId: string, loading: boolean) => {
+  const setBlockToggleLoading = React.useCallback((licenseId: string, loading: boolean) => {
     setLoadingStates((prev: typeof loadingStates) => ({
       ...prev,
       blockToggling: loading 
@@ -65,7 +65,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     }));
   }, []);
 
-  const setActiveToggleLoading = useCallback((licenseId: string, loading: boolean) => {
+  const setActiveToggleLoading = React.useCallback((licenseId: string, loading: boolean) => {
     setLoadingStates((prev: typeof loadingStates) => ({
       ...prev,
       activeToggling: loading 
@@ -74,7 +74,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     }));
   }, []);
   
-  const styles = useMemo(() => ({
+  const styles = React.useMemo(() => ({
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -168,7 +168,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     },
   }), [colors, spacing, fontSize]);
 
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = React.useCallback(async (query: string) => {
     if (!query.trim()) {
       setShowSearchResults(false);
       setSearchResults([]);
@@ -190,7 +190,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     }
   }, [licenseQuery]);
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = React.useCallback(() => {
     if (showSearchResults) {
       // Arama sonuçlarını yenile
       handleSearch(searchQuery);
@@ -201,7 +201,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     }
   }, [showSearchResults, searchQuery, licensesQuery, statsQuery, handleSearch]);
 
-  const handleLicensePress = useCallback((license: TLicense) => {
+  const handleLicensePress = React.useCallback((license: TLicense) => {
     Alert.alert(
       'Lisans Detayı',
       `Lisans No: ${license.no || license.licenseId}\nMüşteri: ${license.customerName}\nMarka: ${license.brandName || 'Belirtilmemiş'}`,
@@ -209,7 +209,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     );
   }, []);
 
-  const handleViewDetails = useCallback((license: TLicense) => {
+  const handleViewDetails = React.useCallback((license: TLicense) => {
     router.push({
       pathname: '/(drawer)/license-detail',
       params: {
@@ -220,7 +220,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
 
   
 
-  const handleSearchInputChange = useCallback((text: string) => {
+  const handleSearchInputChange = React.useCallback((text: string) => {
     setSearchQuery(text);
     if (!text.trim()) {
       setShowSearchResults(false);
@@ -228,18 +228,18 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     }
   }, []);
 
-  const handleSearchSubmit = useCallback(() => {
+  const handleSearchSubmit = React.useCallback(() => {
     handleSearch(searchQuery);
   }, [searchQuery, handleSearch]);
 
-  const handleClearSearch = useCallback(() => {
+  const handleClearSearch = React.useCallback(() => {
     setSearchQuery('');
     setShowSearchResults(false);
     setSearchResults([]);
   }, []);
 
   // Initial search query'yi handle et (notification'dan gelen) - sadece bir kez
-  useEffect(() => {
+  React.useEffect(() => {
     if (initialSearchQuery && initialSearchQuery.trim() && !hasProcessedInitialQuery.current) {
       console.log('🔍 Notification\'dan gelen arama sorgusu:', initialSearchQuery);
       hasProcessedInitialQuery.current = true;
@@ -267,7 +267,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     }
   }, [initialSearchQuery, licenseQuery]);
 
-  const performBlockToggle = useCallback((licenseId: string, block: boolean, blockMessage: string) => {
+  const performBlockToggle = React.useCallback((licenseId: string, block: boolean, blockMessage: string) => {
     setBlockToggleLoading(licenseId, true);
 
     toggleBlockMutation.mutate(
@@ -285,7 +285,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     );
   }, [toggleBlockMutation, setBlockToggleLoading]);
 
-  const handleToggleBlock = useCallback((license: TLicense) => {
+  const handleToggleBlock = React.useCallback((license: TLicense) => {
     if (!license.id) {
       console.error('Lisans ID bulunamadı');
       return;
@@ -317,7 +317,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
 
   
 
-  const handleToggleActive = useCallback((license: TLicense) => {
+  const handleToggleActive = React.useCallback((license: TLicense) => {
     if (!license.id) {
       console.error('Lisans ID bulunamadı');
       return;
@@ -342,7 +342,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     );
   }, [toggleActiveMutation, setActiveToggleLoading]);
 
-  const renderLicenseItem = useCallback(({ item }: { item: TLicense }) => {
+  const renderLicenseItem = React.useCallback(({ item }: { item: TLicense }) => {
     if (!item.id) return null;
     
     return (
@@ -360,7 +360,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     );
   }, [handleLicensePress, handleToggleBlock, handleToggleActive, handleViewDetails, loadingStates, styles]);
 
-  const renderEmptyComponent = useCallback(() => {
+  const renderEmptyComponent = React.useCallback(() => {
     if (isSearching || licensesQuery.isLoading) {
       return (
         <View style={styles.loadingContainer}>
@@ -381,7 +381,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
     );
   }, [isSearching, licensesQuery.isLoading, showSearchResults, colors.primary, styles]);
 
-  const renderHeader = useCallback(() => {
+  const renderHeader = React.useCallback(() => {
     return (
       <>
         {/* Arama Sonuçları Başlığı */}
@@ -462,7 +462,7 @@ export function LicenseScreen({ initialSearchQuery }: LicenseScreenProps = {}) {
       )}
 
       {/* Virtual List */}
-      <FlatList<TLicense>
+      <FlatList
         style={styles.listContainer}
         data={displayLicenses}
         renderItem={renderLicenseItem}

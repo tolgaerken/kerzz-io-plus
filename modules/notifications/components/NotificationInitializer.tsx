@@ -38,20 +38,20 @@ const NotificationInitializer: React.FC<NotificationInitializerProps> = ({ child
     syncTokenWithServer();
   }, [isAuthenticated, hasPermission, isInitialized, user?.id, getToken]);
 
-  // Kullanıcı giriş yaptığında notification izni iste (eğer daha önce istenmemişse)
+  // Uygulama açılışında notification izni iste (authentication durumundan bağımsız)
   useEffect(() => {
-    const requestPermissionIfNeeded = async () => {
-      if (isAuthenticated && !hasPermission && isInitialized) {
-        // Kullanıcıya notification'ların faydalarını anlatan bir modal gösterebiliriz
-        // Şimdilik otomatik olarak izin isteyelim
+    const requestPermissionOnStartup = async () => {
+      if (!hasPermission && isInitialized) {
+        // Uygulama açılışında hemen izin iste
+        console.log('📱 Uygulama açılışında notification izni isteniyor...');
         setTimeout(() => {
           requestPermission();
-        }, 2000); // 2 saniye bekle ki kullanıcı uygulamaya alışsın
+        }, 1000); // 1 saniye bekle ki uygulama tamamen yüklensin
       }
     };
 
-    requestPermissionIfNeeded();
-  }, [isAuthenticated, hasPermission, isInitialized, requestPermission]);
+    requestPermissionOnStartup();
+  }, [hasPermission, isInitialized, requestPermission]);
 
   return <>{children}</>;
 };
