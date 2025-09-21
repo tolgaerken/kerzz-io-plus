@@ -1,4 +1,4 @@
-import { ColorPalette, ThemeName, ThemeMode } from '../types';
+import { ColorPalette, ThemeMode, ThemeName } from '../types';
 
 // 1. Classic (Varsayılan) Tema
 export const classicColors: ColorPalette = {
@@ -133,6 +133,44 @@ export const darkRetroColors: ColorPalette = {
   input: '#3D3025'
 };
 
+// 5. Cozzy Tema (ekli görseldeki sıcak turkuaz-mor tonlarından esinlenildi)
+export const cozzyColors: ColorPalette = {
+  primary: '#27C1C6',        // Turkuaz
+  primaryLight: '#8FE4E7',   // Açık turkuaz
+  primaryDark: '#1A9AA0',    // Koyu turkuaz
+  secondary: '#8A5CF6',      // Mor
+  background: '#E9F7F7',     // Çok açık camgöbeği
+  card: '#FFFFFF',
+  cardAlt: '#F3FBFB',
+  text: '#17222A',
+  textLight: '#5B6A76',
+  border: '#D3E8E9',
+  success: '#22C55E',
+  error: '#EF4444',
+  warning: '#F59E0B',
+  info: '#3B82F6',
+  input: '#E9F7F7'
+};
+
+// Cozzy Dark Theme
+export const darkCozzyColors: ColorPalette = {
+  primary: '#27C1C6',
+  primaryLight: '#5FD9DD',
+  primaryDark: '#127A7E',
+  secondary: '#A78BFA',
+  background: '#0E1620',     // Derin lacivertimsi arka plan
+  card: '#162330',
+  cardAlt: '#1D2C3B',
+  text: '#E6F4F4',
+  textLight: '#9FB6C2',
+  border: '#233546',
+  success: '#22C55E',
+  error: '#F87171',
+  warning: '#FBBF24',
+  info: '#60A5FA',
+  input: '#162330'
+};
+
 // Tema koleksiyonu
 export const themeColors = {
   classic: {
@@ -150,6 +188,10 @@ export const themeColors = {
   retro: {
     light: retroColors,
     dark: darkRetroColors
+  },
+  cozzy: {
+    light: cozzyColors,
+    dark: darkCozzyColors
   }
 } as const;
 
@@ -158,7 +200,8 @@ export const themeLabels: Record<ThemeName, string> = {
   classic: 'Klasik',
   modern: 'Modern',
   futuristic: 'Fütüristik',
-  retro: 'Retro'
+  retro: 'Retro',
+  cozzy: 'Cozzy'
 };
 
 // Varsayılan tema

@@ -212,5 +212,5 @@ export interface ThemeConfig {
   };
 }
 
-export type ThemeName = 'classic' | 'modern' | 'futuristic' | 'retro';
+export type ThemeName = 'classic' | 'modern' | 'futuristic' | 'retro' | 'cozzy';
 export type ThemeMode = 'light' | 'dark';
