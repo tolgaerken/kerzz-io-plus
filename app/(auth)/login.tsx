@@ -93,9 +93,6 @@ const LoginPage: React.FC = () => {
     console.log('📱 Formatlanmış telefon numarası:', formattedPhone);
 
     const success = await sendOTP(formattedPhone);
-    if (success) {
-      Alert.alert('Başarılı', 'OTP kodunuz gönderildi');
-    }
   };
 
   const handleVerifyOTP = async () => {
@@ -106,7 +103,6 @@ const LoginPage: React.FC = () => {
 
     const success = await verifyOTP(otp);
     if (success) {
-      Alert.alert('Başarılı', 'Giriş başarılı');
       router.replace('/');
     }
   };
