@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    View
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  View
 } from 'react-native';
 import { useThemeColor } from '../../hooks/use-theme-color';
 import { TSale } from '../../types/dto';
@@ -148,46 +148,7 @@ export function SalesList({
     },
   });
 
-  const formatCurrency = (amount: number, currency: string = 'tl') => {
-    const currencyMap: { [key: string]: string } = {
-      'tl': 'TRY',
-      'usd': 'USD',
-      'eur': 'EUR'
-    };
-    
-    const currencyCode = currencyMap[currency.toLowerCase()] || 'TRY';
-    const locale = currencyCode === 'TRY' ? 'tr-TR' : 'en-US';
-    
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currencyCode,
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(new Date(date));
-  };
-
-  const getStatusInfo = (sale: TSale) => {
-    if (sale.approved) {
-      return {
-        text: 'Onaylandı',
-        badgeStyle: styles.approvedBadge,
-        textStyle: styles.approvedText,
-      };
-    } else {
-      return {
-        text: 'Beklemede',
-        badgeStyle: styles.pendingBadge,
-        textStyle: styles.pendingText,
-      };
-    }
-  };
+  
 
   const renderSaleItem = ({ item }: { item: TSale }) => {
     return (

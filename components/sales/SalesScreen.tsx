@@ -267,6 +267,12 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
       {
         onSuccess: () => {
           setApproveLoading(sale.id!, false);
+          // Arama sonuçları gösteriliyorsa yerel listeyi güncelle
+          setSearchResults(prev =>
+            showSearchResults
+              ? prev.map(s => (s.id === sale.id ? { ...s, ...updateData } as TSale : s))
+              : prev
+          );
           console.log('✅ Satış onayı güncellendi:', sale.approved ? 'Onay kaldırıldı' : 'Onaylandı');
         },
         onError: (error: any) => {
@@ -298,6 +304,12 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
       {
         onSuccess: () => {
           setInvoiceApproveLoading(sale.id!, false);
+          // Arama sonuçları gösteriliyorsa yerel listeyi güncelle
+          setSearchResults(prev =>
+            showSearchResults
+              ? prev.map(s => (s.id === sale.id ? { ...s, ...updateData } as TSale : s))
+              : prev
+          );
           console.log('✅ Fatura onayı güncellendi:', sale.invoiceApproved ? 'Onay kaldırıldı' : 'Onaylandı');
         },
         onError: (error: any) => {
