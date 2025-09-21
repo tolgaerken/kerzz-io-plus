@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
-import { Alert, Platform } from 'react-native';
+import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import { isFirebaseInitialized } from '../../../config/firebase';
 import {
-    FCMToken,
-    NotificationPermission,
-    NotificationSettings
+  FCMToken,
+  NotificationPermission,
+  NotificationSettings
 } from '../types';
 
 // Platform-specific imports
@@ -172,43 +172,38 @@ class NotificationService {
         return result;
       } else if (Platform.OS === 'android') {
         console.log('🤖 Android notification izni isteniyor...');
-        console.log('🔧 Android Firebase messaging durumu:', {
-          messagingInstance: !!this.messaging,
-          requestPermissionFunction: !!notificationFunctions.requestPermission,
-          AuthorizationStatus: !!notificationFunctions.AuthorizationStatus
-        });
-        
-        // Android için izin isteme
-        const authStatus = await notificationFunctions.requestPermission(this.messaging);
-        console.log('🔍 Android raw authStatus:', authStatus);
-        console.log('🔍 AuthorizationStatus enum:', {
-          AUTHORIZED: notificationFunctions.AuthorizationStatus.AUTHORIZED,
-          PROVISIONAL: notificationFunctions.AuthorizationStatus.PROVISIONAL,
-          NOT_DETERMINED: notificationFunctions.AuthorizationStatus.NOT_DETERMINED,
-          DENIED: notificationFunctions.AuthorizationStatus.DENIED
-        });
-        
-        const enabled =
-          authStatus === notificationFunctions.AuthorizationStatus.AUTHORIZED ||
-          authStatus === notificationFunctions.AuthorizationStatus.PROVISIONAL;
 
-        const result: NotificationPermission = {
-          status: enabled ? 'granted' : 'denied',
-          canAskAgain: authStatus === notificationFunctions.AuthorizationStatus.NOT_DETERMINED
-        };
-        
-        console.log('📱 Android notification izin sonucu:', { 
-          authStatus, 
-          enabled,
-          result,
-          statusComparison: {
-            isAuthorized: authStatus === notificationFunctions.AuthorizationStatus.AUTHORIZED,
-            isProvisional: authStatus === notificationFunctions.AuthorizationStatus.PROVISIONAL,
-            isNotDetermined: authStatus === notificationFunctions.AuthorizationStatus.NOT_DETERMINED,
-            isDenied: authStatus === notificationFunctions.AuthorizationStatus.DENIED
+        // Android 13+ (API 33) için çalışma zamanı izni gerekir
+        const apiLevel = Platform.Version as number;
+        if (apiLevel >= 33) {
+          try {
+            const result = await PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+            );
+
+            const granted = result === PermissionsAndroid.RESULTS.GRANTED;
+            const canAskAgain = result !== PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN;
+
+            const permissionResult: NotificationPermission = {
+              status: granted ? 'granted' : 'denied',
+              canAskAgain,
+            };
+
+            console.log('📱 Android 13+ notification izin sonucu:', {
+              result,
+              permissionResult,
+            });
+
+            return permissionResult;
+          } catch (androidError) {
+            console.error('❌ Android permission request hatası:', androidError);
+            return { status: 'denied', canAskAgain: false };
           }
-        });
-        return result;
+        }
+
+        // Android 12 ve altı için çalışma zamanı izni yok, manifest yeterli
+        console.log('ℹ️ Android < 13 için çalışma zamanı izni gerekmiyor');
+        return { status: 'granted', canAskAgain: true };
       }
 
       // Diğer platformlar için genel izin isteme
@@ -1298,12 +1293,13 @@ class NotificationService {
   private async handleSaleNotification(saleData: any, isAppOpen: boolean): Promise<void> {
     try {
       console.log('💰 Sale notification handler:', { 
-        saleNo: saleData?.no, 
+        saleNo: saleData?.no,
+        saleId: saleData?.id || saleData?._id,
         isAppOpen 
       });
 
-      if (!saleData?.no) {
-        console.error('❌ Sale data\'da no bulunamadı');
+      if (!saleData?.no && !saleData?.id && !saleData?._id) {
+        console.error('❌ Sale data geçersiz (no/id/_id yok)');
         return;
       }
 
@@ -1312,7 +1308,8 @@ class NotificationService {
         await this.showSaleNavigationDialog(saleData);
       } else {
         // Uygulama kapalıyken direkt yönlendir
-        await this.navigateToSale(saleData.no);
+        const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
+        await this.navigateToSale(saleKey);
       }
     } catch (error) {
       console.error('❌ Sale notification handler hatası:', error);
@@ -1326,16 +1323,17 @@ class NotificationService {
     try {
       console.log('🎯 Opportunity notification handler:', {
         opportunityNo: opportunityData?.no,
+        opportunityId: opportunityData?.id || opportunityData?._id,
         isAppOpen
       });
 
-      if (!opportunityData?.no && !opportunityData?.id && !opportunityData?.company) {
-        console.error('❌ Opportunity data geçersiz (no/id/company yok)');
+      if (!opportunityData?.no && !opportunityData?.id && !opportunityData?._id && !opportunityData?.company) {
+        console.error('❌ Opportunity data geçersiz (no/id/_id/company yok)');
         return;
       }
 
       // Öncelik: no → id → company
-      const searchQuery = opportunityData?.no?.toString() || opportunityData?.id || opportunityData?.company;
+      const searchQuery = opportunityData?.no?.toString() || opportunityData?.id || opportunityData?._id || opportunityData?.company;
 
       if (isAppOpen) {
         await this.showOpportunityNavigationDialog(searchQuery, opportunityData);
@@ -1356,6 +1354,7 @@ class NotificationService {
         const title = 'Fırsat Bildirimi';
         const bodyLines: string[] = [];
         if (opportunityData?.no) bodyLines.push(`Fırsat No: ${opportunityData.no}`);
+        if (!opportunityData?.no && (opportunityData?.id || opportunityData?._id)) bodyLines.push(`Fırsat: ${opportunityData?.id || opportunityData?._id}`);
         if (opportunityData?.company) bodyLines.push(`Şirket: ${opportunityData.company}`);
         const message = `${bodyLines.join('\n')}${bodyLines.length ? '\n\n' : ''}Bu fırsatı görüntülemek istiyor musunuz?`;
 
@@ -1435,13 +1434,15 @@ class NotificationService {
         if (Platform.OS === 'web') {
           // Web'de confirm kullan
           const canConfirm = typeof confirm === 'function';
+          const displayKey = saleData?.no ?? saleData?.id ?? saleData?._id;
           const userConfirmed = canConfirm ? confirm(
-            `Satış Bildirimi\n\nSatış No: ${saleData.no}\n\nBu satışı görüntülemek istiyor musunuz?`
+            `Satış Bildirimi\n\nSatış: ${displayKey}\n\nBu satışı görüntülemek istiyor musunuz?`
           ) : true;
           
           if (userConfirmed) {
             console.log('📱 Kullanıcı satış yönlendirmesini onayladı (web)');
-            await this.navigateToSale(saleData.no);
+            const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
+            await this.navigateToSale(saleKey);
           } else {
             console.log('📱 Kullanıcı satış yönlendirmesini iptal etti (web)');
           }
@@ -1451,7 +1452,7 @@ class NotificationService {
           try {
             Alert.alert(
               'Satış Bildirimi',
-              `Satış No: ${saleData.no}\n\nBu satışı görüntülemek istiyor musunuz?`,
+              `Satış: ${saleData?.no ?? saleData?.id ?? saleData?._id}\n\nBu satışı görüntülemek istiyor musunuz?`,
               [
                 {
                   text: 'İptal',
@@ -1465,7 +1466,8 @@ class NotificationService {
                   text: 'Görüntüle',
                   onPress: async () => {
                     console.log('📱 Kullanıcı satış yönlendirmesini onayladı');
-                    await this.navigateToSale(saleData.no);
+                    const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
+                    await this.navigateToSale(saleKey);
                     resolve();
                   }
                 }
@@ -1474,14 +1476,16 @@ class NotificationService {
           } catch (importError) {
             console.error('❌ Alert import hatası:', importError);
             // Alert import edilemezse direkt yönlendir
-            await this.navigateToSale(saleData.no);
+            const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
+            await this.navigateToSale(saleKey);
             resolve();
           }
         }
       } catch (error) {
         console.error('❌ Alert gösterme hatası:', error);
         // Hata durumunda direkt yönlendir
-        await this.navigateToSale(saleData.no);
+        const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
+        await this.navigateToSale(saleKey);
         resolve();
       }
     });
