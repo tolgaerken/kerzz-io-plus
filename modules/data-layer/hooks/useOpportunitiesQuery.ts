@@ -362,12 +362,32 @@ export function useOpportunitiesQuery() {
     };
   };
 
-  // Fırsat numarası ile arama fonksiyonu
+  // Fırsat numarası ile arama fonksiyonu (virgül ile ayrılmış çoklu no'ları destekler)
   const searchOpportunitiesByNumber = async (opportunityNumber: string): Promise<TOpportunity[]> => {
     try {
-      const filter = {
-        no: parseInt(opportunityNumber)
-      };
+      // Virgül ile ayrılmış no'ları kontrol et
+      const numbers = opportunityNumber.split(',').map(num => num.trim()).filter(num => num);
+      
+      let filter;
+      if (numbers.length > 1) {
+        // Çoklu no araması
+        const numberFilters = numbers.map(num => ({ no: parseInt(num) }));
+        
+        filter = {
+          $or: numberFilters
+        };
+      } else {
+        // Tekli no araması (mevcut mantık)
+        filter = {
+          no: parseInt(opportunityNumber)
+        };
+      }
+
+      console.log('🔍 Opportunities arama filtresi:', { 
+        originalQuery: opportunityNumber, 
+        numbers, 
+        filter: JSON.stringify(filter) 
+      });
 
       // baseQuery'nin fetchList fonksiyonunu kullan
       const results = await baseQuery.fetchList({

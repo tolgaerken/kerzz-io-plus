@@ -22,8 +22,8 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   
-  // Initial search query'nin sadece bir kez çalışması için ref
-  const hasProcessedInitialQuery = useRef(false);
+  // Initial search query'nin tekrar arama yapmaması için ref
+  const hasProcessedInitialQuery = useRef<string | null>(null);
   
   // Arama state'leri
   const [searchQuery, setSearchQuery] = useState('');
@@ -217,11 +217,18 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
     setSearchResults([]);
   }, []);
 
-  // Initial search query'yi handle et (notification'dan gelen) - sadece bir kez
+  // Initial search query'yi handle et (notification'dan gelen)
   useEffect(() => {
-    if (initialSearchQuery && initialSearchQuery.trim() && !hasProcessedInitialQuery.current) {
+    if (initialSearchQuery && initialSearchQuery.trim()) {
       console.log('🔍 Notification\'dan gelen arama sorgusu:', initialSearchQuery);
-      hasProcessedInitialQuery.current = true;
+      
+      // Eğer aynı sorgu ise tekrar arama yapma
+      if (hasProcessedInitialQuery.current === initialSearchQuery) {
+        console.log('⏭️ Aynı arama sorgusu, tekrar arama yapılmıyor');
+        return;
+      }
+      
+      hasProcessedInitialQuery.current = initialSearchQuery;
       
       setSearchQuery(initialSearchQuery.trim());
       

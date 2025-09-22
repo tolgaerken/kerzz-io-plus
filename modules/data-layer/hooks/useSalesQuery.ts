@@ -288,15 +288,40 @@ export function useSalesQuery() {
     };
   };
 
-  // Satış numarası ile arama fonksiyonu
+  // Satış numarası ile arama fonksiyonu (virgül ile ayrılmış çoklu no'ları destekler)
   const searchSalesByNumber = async (saleNumber: string): Promise<TSale[]> => {
     try {
-      const filter = {
-        $or: [
-          { no: parseInt(saleNumber) },
-          { number: parseInt(saleNumber) }
-        ]
-      };
+      // Virgül ile ayrılmış no'ları kontrol et
+      const numbers = saleNumber.split(',').map(num => num.trim()).filter(num => num);
+      
+      let filter;
+      if (numbers.length > 1) {
+        // Çoklu no araması
+        const numberFilters = numbers.map(num => ({
+          $or: [
+            { no: parseInt(num) },
+            { number: parseInt(num) }
+          ]
+        }));
+        
+        filter = {
+          $or: numberFilters
+        };
+      } else {
+        // Tekli no araması (mevcut mantık)
+        filter = {
+          $or: [
+            { no: parseInt(saleNumber) },
+            { number: parseInt(saleNumber) }
+          ]
+        };
+      }
+
+      console.log('🔍 Sales arama filtresi:', { 
+        originalQuery: saleNumber, 
+        numbers, 
+        filter: JSON.stringify(filter) 
+      });
 
       // baseQuery'nin fetchList fonksiyonunu kullan
       const results = await baseQuery.fetchList({

@@ -1293,23 +1293,96 @@ class NotificationService {
   private async handleSaleNotification(saleData: any, isAppOpen: boolean): Promise<void> {
     try {
       console.log('💰 Sale notification handler:', { 
-        saleNo: saleData?.no,
-        saleId: saleData?.id || saleData?._id,
+        saleData,
         isAppOpen 
       });
 
-      if (!saleData?.no && !saleData?.id && !saleData?._id) {
-        console.error('❌ Sale data geçersiz (no/id/_id yok)');
-        return;
+      // String olarak gelen JSON'u parse et
+      let parsedData = saleData;
+      if (typeof saleData === 'string') {
+        // Çift quoted string'i temizle: "'[...]'" -> "[...]"
+        let cleanedString = saleData;
+        
+        try {
+          // Başında ve sonunda tek tırnak varsa kaldır
+          if (cleanedString.startsWith("'") && cleanedString.endsWith("'")) {
+            cleanedString = cleanedString.slice(1, -1);
+            console.log('🧹 Tek tırnaklar kaldırıldı:', cleanedString);
+          }
+          
+          // Başında ve sonunda çift tırnak varsa kaldır
+          if (cleanedString.startsWith('"') && cleanedString.endsWith('"')) {
+            cleanedString = cleanedString.slice(1, -1);
+            console.log('🧹 Çift tırnaklar kaldırıldı:', cleanedString);
+          }
+          
+          parsedData = JSON.parse(cleanedString);
+          console.log('📝 String JSON parse edildi:', parsedData);
+        } catch (parseError) {
+          console.error('❌ JSON parse hatası:', parseError);
+          console.error('❌ Geçersiz JSON string:', saleData);
+          console.error('❌ Temizlenmiş string:', cleanedString);
+          return;
+        }
       }
 
+      // Yeni format: array of objects [{id, no}, {id, no}, ...]
+      let searchQuery: string;
+      
+      if (Array.isArray(parsedData)) {
+        // Array formatında geliyorsa no değerlerini çıkar
+        const noValues = parsedData
+          .map(item => item?.no)
+          .filter(no => no) // Boş değerleri filtrele
+          .filter((no, index, arr) => arr.indexOf(no) === index); // Duplicate'leri kaldır
+        
+        if (noValues.length === 0) {
+          console.error('❌ Sale data array\'inde geçerli no değeri yok');
+          return;
+        }
+        
+        searchQuery = noValues.join(',');
+      } else {
+        // Eski format: tek obje
+        if (!parsedData?.no && !parsedData?.id && !parsedData?._id) {
+          console.error('❌ Sale data geçersiz (no/id/_id yok)');
+          return;
+        }
+
+        // no alanı array ise virgül ile birleştir
+        searchQuery = Array.isArray(parsedData?.no) 
+          ? parsedData.no.join(',') 
+          : parsedData?.no?.toString() || parsedData?.id || parsedData?._id;
+      }
+
+      console.log('🔍 Sale için oluşturulan searchQuery:', {
+        searchQuery,
+        originalData: saleData,
+        parsedData: parsedData,
+        isArray: Array.isArray(parsedData)
+      });
+
       if (isAppOpen) {
-        // Uygulama açıkken onay dialog göster
-        await this.showSaleNavigationDialog(saleData);
+        // Uygulama açıkken - mevcut sayfayı kontrol et
+        try {
+          const { router } = await import('expo-router');
+          const currentRoute = router.canGoBack() ? 'unknown' : 'root';
+          
+          console.log('📍 Mevcut route bilgisi:', { currentRoute });
+          
+          // Eğer zaten sales sayfasındaysak direkt arama yap, değilse dialog göster
+          // Router state'i tam olarak alamadığımız için şimdilik her zaman direkt navigation yapalım
+          console.log('🚀 Foreground notification - direkt sales sayfasına yönlendiriliyor');
+          await this.navigateToSale(searchQuery);
+          
+        } catch (routerError) {
+          console.error('❌ Router import hatası, dialog gösteriliyor:', routerError);
+          // Router hatası varsa dialog göster
+          await this.showSaleNavigationDialog(parsedData, searchQuery);
+        }
       } else {
         // Uygulama kapalıyken direkt yönlendir
-        const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
-        await this.navigateToSale(saleKey);
+        await this.navigateToSale(searchQuery);
       }
     } catch (error) {
       console.error('❌ Sale notification handler hatası:', error);
@@ -1322,21 +1395,89 @@ class NotificationService {
   private async handleOpportunityNotification(opportunityData: any, isAppOpen: boolean): Promise<void> {
     try {
       console.log('🎯 Opportunity notification handler:', {
-        opportunityNo: opportunityData?.no,
-        opportunityId: opportunityData?.id || opportunityData?._id,
+        opportunityData,
         isAppOpen
       });
 
-      if (!opportunityData?.no && !opportunityData?.id && !opportunityData?._id && !opportunityData?.company) {
-        console.error('❌ Opportunity data geçersiz (no/id/_id/company yok)');
-        return;
+      // String olarak gelen JSON'u parse et
+      let parsedData = opportunityData;
+      if (typeof opportunityData === 'string') {
+        // Çift quoted string'i temizle: "'[...]'" -> "[...]"
+        let cleanedString = opportunityData;
+        
+        try {
+          // Başında ve sonunda tek tırnak varsa kaldır
+          if (cleanedString.startsWith("'") && cleanedString.endsWith("'")) {
+            cleanedString = cleanedString.slice(1, -1);
+            console.log('🧹 Opportunity tek tırnaklar kaldırıldı:', cleanedString);
+          }
+          
+          // Başında ve sonunda çift tırnak varsa kaldır
+          if (cleanedString.startsWith('"') && cleanedString.endsWith('"')) {
+            cleanedString = cleanedString.slice(1, -1);
+            console.log('🧹 Opportunity çift tırnaklar kaldırıldı:', cleanedString);
+          }
+          
+          parsedData = JSON.parse(cleanedString);
+          console.log('📝 Opportunity string JSON parse edildi:', parsedData);
+        } catch (parseError) {
+          console.error('❌ Opportunity JSON parse hatası:', parseError);
+          console.error('❌ Geçersiz JSON string:', opportunityData);
+          console.error('❌ Temizlenmiş string:', cleanedString);
+          return;
+        }
       }
 
-      // Öncelik: no → id → company
-      const searchQuery = opportunityData?.no?.toString() || opportunityData?.id || opportunityData?._id || opportunityData?.company;
+      // Yeni format: array of objects [{id, no}, {id, no}, ...]
+      let searchQuery: string;
+      
+      if (Array.isArray(parsedData)) {
+        // Array formatında geliyorsa no değerlerini çıkar
+        const noValues = parsedData
+          .map(item => item?.no)
+          .filter(no => no) // Boş değerleri filtrele
+          .filter((no, index, arr) => arr.indexOf(no) === index); // Duplicate'leri kaldır
+        
+        if (noValues.length === 0) {
+          console.error('❌ Opportunity data array\'inde geçerli no değeri yok');
+          return;
+        }
+        
+        searchQuery = noValues.join(',');
+      } else {
+        // Eski format: tek obje
+        if (!parsedData?.no && !parsedData?.id && !parsedData?._id && !parsedData?.company) {
+          console.error('❌ Opportunity data geçersiz (no/id/_id/company yok)');
+          return;
+        }
+
+        // no alanı array ise virgül ile birleştir, değilse string'e çevir
+        if (Array.isArray(parsedData?.no)) {
+          searchQuery = parsedData.no.join(',');
+        } else {
+          // Öncelik: no → id → company
+          searchQuery = parsedData?.no?.toString() || parsedData?.id || parsedData?._id || parsedData?.company;
+        }
+      }
+      
+      console.log('🔍 Opportunity için oluşturulan searchQuery:', {
+        searchQuery,
+        type: typeof searchQuery,
+        originalData: opportunityData,
+        parsedData: parsedData,
+        isArray: Array.isArray(parsedData)
+      });
 
       if (isAppOpen) {
-        await this.showOpportunityNavigationDialog(searchQuery, opportunityData);
+        // Uygulama açıkken - direkt navigation yap
+        try {
+          console.log('🚀 Foreground opportunity notification - direkt opportunities sayfasına yönlendiriliyor');
+          await this.navigateToOpportunity(searchQuery);
+        } catch (routerError) {
+          console.error('❌ Router import hatası, dialog gösteriliyor:', routerError);
+          // Router hatası varsa dialog göster
+          await this.showOpportunityNavigationDialog(searchQuery, parsedData);
+        }
       } else {
         await this.navigateToOpportunity(searchQuery);
       }
@@ -1411,12 +1552,24 @@ class NotificationService {
    */
   private async navigateToOpportunity(searchQuery: string): Promise<void> {
     try {
-      console.log('🧭 Fırsata yönlendiriliyor, arama:', searchQuery);
+      console.log('🧭 Fırsata yönlendiriliyor:', {
+        searchQuery,
+        type: typeof searchQuery,
+        length: searchQuery?.length,
+        stringified: searchQuery?.toString?.() || String(searchQuery)
+      });
       const { router } = await import('expo-router');
+      
+      const finalSearchQuery = searchQuery?.toString?.() || String(searchQuery);
+      console.log('📤 Router\'a gönderilen params:', {
+        pathname: '/(drawer)/opportunities',
+        params: { searchQuery: finalSearchQuery }
+      });
+      
       router.push({
         pathname: '/(drawer)/opportunities',
         params: {
-          searchQuery: searchQuery?.toString?.() || String(searchQuery)
+          searchQuery: finalSearchQuery
         }
       });
       console.log('✅ Fırsatlar sayfasına yönlendirildi');
@@ -1428,21 +1581,32 @@ class NotificationService {
   /**
    * Satış yönlendirme onay dialogu (uygulama açıkken)
    */
-  private async showSaleNavigationDialog(saleData: any): Promise<void> {
+  private async showSaleNavigationDialog(saleData: any, searchQuery?: string): Promise<void> {
     return new Promise(async (resolve) => {
       try {
         if (Platform.OS === 'web') {
           // Web'de confirm kullan
           const canConfirm = typeof confirm === 'function';
-          const displayKey = saleData?.no ?? saleData?.id ?? saleData?._id;
+          let displayKey = searchQuery;
+          
+          if (!displayKey) {
+            if (Array.isArray(saleData)) {
+              // Yeni format: array of objects
+              const noValues = saleData.map(item => item?.no).filter(no => no);
+              displayKey = noValues.join(',');
+            } else {
+              // Eski format: tek obje
+              displayKey = Array.isArray(saleData?.no) ? saleData.no.join(',') : saleData?.no ?? saleData?.id ?? saleData?._id;
+            }
+          }
+          
           const userConfirmed = canConfirm ? confirm(
             `Satış Bildirimi\n\nSatış: ${displayKey}\n\nBu satışı görüntülemek istiyor musunuz?`
           ) : true;
           
           if (userConfirmed) {
             console.log('📱 Kullanıcı satış yönlendirmesini onayladı (web)');
-            const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
-            await this.navigateToSale(saleKey);
+            await this.navigateToSale(searchQuery || displayKey || '');
           } else {
             console.log('📱 Kullanıcı satış yönlendirmesini iptal etti (web)');
           }
@@ -1450,9 +1614,22 @@ class NotificationService {
         } else {
           // React Native Alert'i güvenli şekilde import et
           try {
+            let displayKey = searchQuery;
+            
+            if (!displayKey) {
+              if (Array.isArray(saleData)) {
+                // Yeni format: array of objects
+                const noValues = saleData.map(item => item?.no).filter(no => no);
+                displayKey = noValues.join(',');
+              } else {
+                // Eski format: tek obje
+                displayKey = Array.isArray(saleData?.no) ? saleData.no.join(',') : saleData?.no ?? saleData?.id ?? saleData?._id;
+              }
+            }
+            
             Alert.alert(
               'Satış Bildirimi',
-              `Satış: ${saleData?.no ?? saleData?.id ?? saleData?._id}\n\nBu satışı görüntülemek istiyor musunuz?`,
+              `Satış: ${displayKey}\n\nBu satışı görüntülemek istiyor musunuz?`,
               [
                 {
                   text: 'İptal',
@@ -1466,8 +1643,7 @@ class NotificationService {
                   text: 'Görüntüle',
                   onPress: async () => {
                     console.log('📱 Kullanıcı satış yönlendirmesini onayladı');
-                    const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
-                    await this.navigateToSale(saleKey);
+                    await this.navigateToSale(searchQuery || displayKey || '');
                     resolve();
                   }
                 }
@@ -1476,16 +1652,32 @@ class NotificationService {
           } catch (importError) {
             console.error('❌ Alert import hatası:', importError);
             // Alert import edilemezse direkt yönlendir
-            const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
-            await this.navigateToSale(saleKey);
+            let fallbackKey = searchQuery;
+            if (!fallbackKey) {
+              if (Array.isArray(saleData)) {
+                const noValues = saleData.map(item => item?.no).filter(no => no);
+                fallbackKey = noValues.join(',');
+              } else {
+                fallbackKey = Array.isArray(saleData?.no) ? saleData.no.join(',') : saleData?.no ?? saleData?.id ?? saleData?._id;
+              }
+            }
+            await this.navigateToSale(fallbackKey || '');
             resolve();
           }
         }
       } catch (error) {
         console.error('❌ Alert gösterme hatası:', error);
         // Hata durumunda direkt yönlendir
-        const saleKey = saleData?.no ?? saleData?.id ?? saleData?._id;
-        await this.navigateToSale(saleKey);
+        let fallbackKey = searchQuery;
+        if (!fallbackKey) {
+          if (Array.isArray(saleData)) {
+            const noValues = saleData.map(item => item?.no).filter(no => no);
+            fallbackKey = noValues.join(',');
+          } else {
+            fallbackKey = Array.isArray(saleData?.no) ? saleData.no.join(',') : saleData?.no ?? saleData?.id ?? saleData?._id;
+          }
+        }
+        await this.navigateToSale(fallbackKey || '');
         resolve();
       }
     });
@@ -1687,6 +1879,92 @@ class NotificationService {
   }
 
   /**
+   * Test için opportunity notification handler'ı manuel olarak çağır
+   */
+  async testOpportunityNotificationHandler(opportunityNo: string | number, isAppOpen: boolean = true, testFormat: 'object' | 'simple-json' | 'complex-json' | 'wrong-format' = 'object'): Promise<void> {
+    console.log('🧪 Test opportunity notification handler çağrılıyor:', { opportunityNo, isAppOpen, testFormat });
+    
+    let testNotification;
+    
+    const opportunityData = {
+      id: "opp-182b-79eb",
+      no: opportunityNo.toString(),
+      company: "Test Şirketi A.Ş."
+    };
+    
+    // Yanlış format testi - 'no' string literal olarak geliyor
+    const wrongOpportunityData = {
+      id: "opp-182b-79eb",
+      no: "no", // Bu yanlış format - string literal 'no'
+      company: "Test Şirketi A.Ş."
+    };
+    
+    switch (testFormat) {
+      case 'object':
+        // fullDocument'ı obje olarak test et
+        testNotification = {
+          data: {
+            module: 'opportunity',
+            fullDocument: opportunityData
+          },
+          notification: {
+            title: 'Yeni Fırsat',
+            body: `Fırsat No: ${opportunityNo} için bildirim`
+          }
+        };
+        break;
+        
+      case 'simple-json':
+        // fullDocument'ı basit JSON string olarak test et
+        testNotification = {
+          data: {
+            module: 'opportunity',
+            fullDocument: JSON.stringify(opportunityData)
+          },
+          notification: {
+            title: 'Yeni Fırsat (Simple JSON)',
+            body: `Fırsat No: ${opportunityNo} için bildirim (basit JSON string)`
+          }
+        };
+        break;
+        
+      case 'complex-json':
+        // Gerçek notification formatını simüle et (çoklu escape)
+        const complexFullDocument = JSON.stringify(JSON.stringify(opportunityData));
+        testNotification = {
+          data: {
+            timestamp: new Date().toISOString(),
+            module: 'opportunity',
+            fullDocument: complexFullDocument,
+            pushLogId: "",
+            source: "kerzz-ai-backend"
+          },
+          notification: {
+            title: 'Yeni Fırsat (Complex JSON)',
+            body: `Fırsat No: ${opportunityNo} için bildirim (karmaşık JSON string)`
+          }
+        };
+        break;
+        
+      case 'wrong-format':
+        // Yanlış format testi - 'no' field'ı string literal 'no' olarak geliyor
+        testNotification = {
+          data: {
+            module: 'opportunity',
+            fullDocument: wrongOpportunityData
+          },
+          notification: {
+            title: 'Yeni Fırsat (Yanlış Format)',
+            body: `Fırsat için bildirim (no field'ı yanlış)`
+          }
+        };
+        break;
+    }
+
+    await this.handleNotification(testNotification, isAppOpen);
+  }
+
+  /**
    * Android notification debug bilgilerini göster
    */
   async debugAndroidNotifications(): Promise<void> {
@@ -1759,7 +2037,8 @@ class NotificationService {
     console.log('  • timestamp: Log zamanı');
     console.log('');
     console.log('🎯 Test için push notification gönderin ve console\'ı kontrol edin!');
-    console.log('🧪 Test için: NotificationService.getInstance().testNotificationHandler("12345", true/false)');
+    console.log('🧪 Sale Test için: NotificationService.getInstance().testNotificationHandler("12345", true/false)');
+    console.log('🧪 Opportunity Test için: NotificationService.getInstance().testOpportunityNotificationHandler("67890", true/false, "wrong-format")');
   }
 }
 
