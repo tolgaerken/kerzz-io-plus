@@ -79,6 +79,15 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="bank-transactions"
+          options={{
+            title: 'Banka İşlemleri',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="creditcard.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="profile"
           options={{
             title: 'Profil',
@@ -120,7 +129,7 @@ export default function DrawerLayout() {
         <Drawer.Screen
           name="bank-transaction-detail"
           options={{
-            title: 'Banka Hareketi',
+            title: 'Banka İşlemi Detayı',
             drawerItemStyle: { display: 'none' }, // Hide from drawer menu
           }}
         />

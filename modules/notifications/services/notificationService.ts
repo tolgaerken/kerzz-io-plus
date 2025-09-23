@@ -1713,19 +1713,66 @@ class NotificationService {
   private async handleBankTransactionNotification(transactionData: any, isAppOpen: boolean): Promise<void> {
     try {
       console.log('🏦 Banka hareketi notification handler:', {
-        id: transactionData?.id || transactionData?._id || transactionData?.no || transactionData?.transactionNo,
+        id: transactionData?.id || transactionData?._id,
         isAppOpen
       });
 
-      if (!transactionData || Object.keys(transactionData).length === 0) {
+      // String olarak gelen JSON'u parse et
+      let parsedData = transactionData;
+      if (typeof transactionData === 'string') {
+        try {
+          // Başında ve sonunda tek tırnak varsa kaldır
+          let cleanedString = transactionData;
+          if (cleanedString.startsWith("'") && cleanedString.endsWith("'")) {
+            cleanedString = cleanedString.slice(1, -1);
+          }
+          
+          // Başında ve sonunda çift tırnak varsa kaldır
+          if (cleanedString.startsWith('"') && cleanedString.endsWith('"')) {
+            cleanedString = cleanedString.slice(1, -1);
+          }
+          
+          parsedData = JSON.parse(cleanedString);
+          console.log('📝 Bank transaction string JSON parse edildi:', parsedData);
+        } catch (parseError) {
+          console.error('❌ Bank transaction JSON parse hatası:', parseError);
+          console.error('❌ Geçersiz JSON string:', transactionData);
+          return;
+        }
+      }
+
+      if (!parsedData || Object.keys(parsedData).length === 0) {
         console.error('❌ Banka hareketi verisi geçersiz');
         return;
       }
 
+      // Transaction ID'sini belirle
+      const transactionId = parsedData?.id || parsedData?._id;
+      
+      if (!transactionId) {
+        console.error('❌ Banka hareketi ID\'si bulunamadı');
+        return;
+      }
+
+      console.log('🔍 Bank transaction için oluşturulan ID:', {
+        transactionId,
+        originalData: transactionData,
+        parsedData: parsedData
+      });
+
       if (isAppOpen) {
-        await this.showBankTransactionNavigationDialog(transactionData);
+        // Uygulama açıkken - direkt navigation yap
+        try {
+          console.log('🚀 Foreground bank transaction notification - direkt bank-transactions sayfasına yönlendiriliyor');
+          await this.navigateToBankTransactionsList(transactionId);
+        } catch (routerError) {
+          console.error('❌ Router import hatası, dialog gösteriliyor:', routerError);
+          // Router hatası varsa dialog göster
+          await this.showBankTransactionNavigationDialog(parsedData);
+        }
       } else {
-        await this.navigateToBankTransaction(transactionData);
+        // Uygulama kapalıyken direkt yönlendir
+        await this.navigateToBankTransactionsList(transactionId);
       }
     } catch (error) {
       console.error('❌ Banka hareketi notification handler hatası:', error);
@@ -1740,7 +1787,7 @@ class NotificationService {
       try {
         const title = 'Banka Hareketi Bildirimi';
         const lines: string[] = [];
-        const txNo = transactionData?.transactionNo || transactionData?.no || transactionData?.id || transactionData?._id;
+        const txNo = transactionData?.id || transactionData?._id;
         if (txNo) lines.push(`Hareket No: ${txNo}`);
         if (transactionData?.amount) lines.push(`Tutar: ${transactionData.amount} ${transactionData?.currency || ''}`.trim());
         if (transactionData?.company) lines.push(`Şirket: ${transactionData.company}`);
@@ -1796,7 +1843,42 @@ class NotificationService {
   }
 
   /**
-   * Banka hareketine yönlendirme (mock detay ekranına git)
+   * Banka hareketi listesine yönlendirme (bank-transactions ekranına git ve ilgili transaction'a scroll yap)
+   */
+  private async navigateToBankTransactionsList(transactionId: string): Promise<void> {
+    try {
+      console.log('🧭 Banka hareketi listesine yönlendiriliyor:', {
+        transactionId,
+        type: typeof transactionId,
+        length: transactionId?.length
+      });
+      
+      const { router } = await import('expo-router');
+      
+      const finalTransactionId = transactionId?.toString?.() || String(transactionId);
+      console.log('📤 Router\'a gönderilen params:', {
+        pathname: '/(drawer)/bank-transactions',
+        params: { scrollToTransactionId: finalTransactionId }
+      });
+      
+      // Her zaman replace kullan - bu sayede aynı sayfadayken de parametreler güncellenir
+      console.log('🔄 Router replace kullanılıyor (parametreleri güncellemek için)');
+      router.replace({
+        pathname: '/(drawer)/bank-transactions',
+        params: {
+          scrollToTransactionId: finalTransactionId,
+          timestamp: Date.now().toString() // Cache busting için
+        }
+      });
+      
+      console.log('✅ Banka hareketi listesine yönlendirildi');
+    } catch (error) {
+      console.error('❌ Banka hareketi liste yönlendirme hatası:', error);
+    }
+  }
+
+  /**
+   * Banka hareketine yönlendirme (detay ekranına git - eski fonksiyon)
    */
   private async navigateToBankTransaction(transactionData: any): Promise<void> {
     try {
@@ -1870,6 +1952,90 @@ class NotificationService {
           notification: {
             title: 'Yeni Satış (Complex JSON)',
             body: `Satış No: ${saleNo} için bildirim (karmaşık JSON string)`
+          }
+        };
+        break;
+    }
+
+    await this.handleNotification(testNotification, isAppOpen);
+  }
+
+  /**
+   * Test için bank transaction notification handler'ı manuel olarak çağır
+   */
+  async testBankTransactionNotificationHandler(transactionId: string, isAppOpen: boolean = true, testFormat: 'object' | 'simple-json' | 'complex-json' = 'object'): Promise<void> {
+    console.log('🧪 Test bank transaction notification handler çağrılıyor:', { transactionId, isAppOpen, testFormat });
+    
+    let testNotification;
+    
+    const transactionData = {
+      id: transactionId,
+      accounId: "acc-123",
+      name: "Test Banka Hareketi",
+      dc: "C",
+      code: "TRF",
+      amount: 1500.00,
+      balance: 25000.00,
+      description: "Test notification için örnek banka hareketi",
+      businessDate: new Date(),
+      createDate: new Date(),
+      opponentId: "opp-456",
+      opponentIban: "TR123456789012345678901234",
+      sourceId: "src-789",
+      source: "API",
+      bankAccId: "bank-acc-123",
+      bankAccName: "Test Banka Hesabı",
+      bankId: "bank-001",
+      bankName: "Test Bankası",
+      erpStatus: "waiting" as const,
+      erpMessage: "",
+      erpGlAccountCode: "120.01",
+      erpAccountCode: "120.01.001"
+    };
+    
+    switch (testFormat) {
+      case 'object':
+        // fullDocument'ı obje olarak test et
+        testNotification = {
+          data: {
+            module: 'bank-transaction',
+            fullDocument: transactionData
+          },
+          notification: {
+            title: 'Yeni Banka Hareketi',
+            body: `${transactionData.amount} TL tutarında yeni işlem`
+          }
+        };
+        break;
+        
+      case 'simple-json':
+        // fullDocument'ı basit JSON string olarak test et
+        testNotification = {
+          data: {
+            module: 'bank-transaction',
+            fullDocument: JSON.stringify(transactionData)
+          },
+          notification: {
+            title: 'Yeni Banka Hareketi (Simple JSON)',
+            body: `${transactionData.amount} TL tutarında yeni işlem (basit JSON string)`
+          }
+        };
+        break;
+        
+      case 'complex-json':
+        // Gerçek notification formatını simüle et (çoklu escape)
+        const complexFullDocument = JSON.stringify(JSON.stringify(transactionData));
+        testNotification = {
+          data: {
+            timestamp: new Date().toISOString(),
+            module: 'bank-transaction',
+            fullDocument: complexFullDocument,
+            pushLogId: "",
+            source: "kerzz-ai-backend"
+          },
+          notification: {
+            title: 'Yeni Banka Hareketi (Complex JSON)',
+            body: `${transactionData.amount} TL tutarında yeni işlem (karmaşık JSON string)`
           }
         };
         break;
@@ -2039,6 +2205,7 @@ class NotificationService {
     console.log('🎯 Test için push notification gönderin ve console\'ı kontrol edin!');
     console.log('🧪 Sale Test için: NotificationService.getInstance().testNotificationHandler("12345", true/false)');
     console.log('🧪 Opportunity Test için: NotificationService.getInstance().testOpportunityNotificationHandler("67890", true/false, "wrong-format")');
+    console.log('🧪 Bank Transaction Test için: NotificationService.getInstance().testBankTransactionNotificationHandler("tx-12345", true/false, "complex-json")');
   }
 }
 

@@ -1,0 +1,8 @@
+.date-filter-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.date-filter-buttons .dx-button {
+  margin-right: 5px;
+}

@@ -1,0 +1,196 @@
+<!-- Banka Özeti Bileşeni -->
+<app-t-bank-summary [dateRange]="dateRange"></app-t-bank-summary>
+
+<div style="display: flex; align-items: center; width: 100%; margin-bottom: 10px; justify-content: center;">
+  <dx-select-box [(value)]="selectedCompany" (onSelectionChanged)="ChangeCompany($event)"
+    [dataSource]="netsisService.erpCompanies()" valueExpr="companyName" displayExpr="companyName"></dx-select-box>
+  &nbsp;
+  <dx-select-box [(value)]="selectedStatus" (onSelectionChanged)="Refresh($event)" [dataSource]="status" valueExpr="id"
+    displayExpr="name"></dx-select-box>
+  <div style="width: 20px;"></div>
+  
+  <!-- Tarih filtresi eklendi -->
+  <div style="display: flex; align-items: center; gap: 5px;">
+    <dx-date-box
+      id="startDateBox"
+      [(value)]="dateRange.startDate"
+      [showClearButton]="true"
+      type="date"
+      placeholder="Başlangıç tarihi"
+      (onValueChanged)="onDateRangeChanged($event)">
+    </dx-date-box>
+    <span>-</span>
+    <dx-date-box
+      id="endDateBox"
+      [(value)]="dateRange.endDate"
+      [showClearButton]="true"
+      type="date"
+      placeholder="Bitiş tarihi"
+      [min]="dateRange.startDate"
+      (onValueChanged)="onDateRangeChanged($event)">
+    </dx-date-box>
+  </div>
+  <div style="width: 20px;"></div>
+  
+  <!-- Ön tanımlı filtre butonları -->
+  <div class="date-filter-buttons">
+    <dx-button text="Bugün" type="default" [width]="80" (onClick)="selectDateRange('today')"></dx-button>
+    <dx-button text="Dün" type="default" [width]="80" (onClick)="selectDateRange('yesterday')"></dx-button>
+    <dx-button text="Bu Hafta" type="default" [width]="100" (onClick)="selectDateRange('thisWeek')"></dx-button>
+    <dx-button text="Geçen Hafta" type="default" [width]="100" (onClick)="selectDateRange('lastWeek')"></dx-button>
+  </div>
+  <div style="width: 20px;"></div>
+  
+  <dx-button stylingMode="contained" text="Tazele" type="success" [width]="120" (onClick)="Refresh()">
+  </dx-button>
+</div>
+
+<dx-data-grid id="bankSocketGrid" [dataSource]="filteredTransactions" class="grid" [hoverStateEnabled]="true"
+  style="font-size:10px;" #bankSocketGrid [columnHidingEnabled]="true" [(selectedRowKeys)]="selectedRows" keyExpr="id"
+  [showBorders]="true" style="margin:auto;" [columnAutoWidth]="true" (onContentReady)="contentReady($event)"
+  [rowAlternationEnabled]="true" [hoverStateEnabled]="true"
+  [allowColumnResizing]="true" (onExporting)="onExporting($event)" columnResizingMode="widget"
+  (onRowUpdating)="updatingRow($event)">
+
+  <dxo-editing mode="batch" [allowUpdating]="true" [allowDeleting]="false" [allowAdding]="false">
+  </dxo-editing>
+
+
+  <dxo-column-fixing [enabled]="true"></dxo-column-fixing>
+  <dxo-filter-row [visible]="true" [applyFilter]=""></dxo-filter-row>
+  <dxo-filter-panel [visible]="true"></dxo-filter-panel>
+  <dxo-header-filter [visible]="true"></dxo-header-filter>
+  <dxo-column-chooser [enabled]="true"></dxo-column-chooser>
+  <dxo-search-panel [visible]="true" [width]="240" placeholder="Ara..."></dxo-search-panel>
+  <dxo-state-storing [enabled]="true" type="localStorage" storageKey="bankTransactionsGrid_1"></dxo-state-storing>
+  <dxo-selection mode="single"></dxo-selection>
+  <dxo-load-panel [enabled]="true">
+  </dxo-load-panel>
+  <dxo-export [enabled]="true" fileName="BankTransactions" [allowExportSelectedData]="false"></dxo-export>
+
+  <!-- <dxo-scrolling mode="infinite"></dxo-scrolling> -->
+
+  <dxo-group-panel [visible]="true"></dxo-group-panel>
+  <dxo-grouping #expand [autoExpandAll]="true"></dxo-grouping>
+
+  <dxi-column hidingPriority="1" type="buttons" [width]="80" caption="Command">
+    <dxi-button name="delete"></dxi-button>
+    <dxi-button name="add"></dxi-button>
+  </dxi-column>
+
+  <dxi-column [hidingPriority]="3" [width]="110" [allowEditing]="false" dataField="bankAccId" caption="Banka id">
+
+  </dxi-column>
+
+  <dxi-column [hidingPriority]="3" [width]="110" [allowEditing]="false" dataField="bankAccId" caption="Banka">
+    <dxo-lookup [dataSource]="banksocketService.bankAccounts" displayExpr="bankAccName" valueExpr="bankAccId">
+    </dxo-lookup>
+    <dxi-validation-rule type="required" message="">
+    </dxi-validation-rule>
+  </dxi-column>
+
+
+  <dxi-column hidingPriority="0" [allowEditing]="false" [editorOptions]="{ displayFormat: 'dd/MM/yyyy HH:mm' }" 
+    dataField="createDate" format="dd/MM/yyyy HH:mm" dataType="date" [width]="110" caption="Create Date">
+  </dxi-column>
+
+
+  <dxi-column [allowEditing]="false" [width]="200" dataField="description"></dxi-column>
+  <dxi-column [width]="100" [allowEditing]="false" format="#,###.00" dataType="number" dataField="amount">
+  </dxi-column>
+  <!-- <dxi-column format="#,###.00" dataType="number" dataField="balance"></dxi-column> -->
+  <dxi-column [hidingPriority]="1" [width]="65" [allowEditing]="false" dataField="erpStatus"></dxi-column>
+
+  <dxi-column [hidingPriority]="1" [width]="100" [allowEditing]="false" dataField="opponentIban"></dxi-column>
+
+
+  <dxi-column [hidingPriority]="1" dataField="erpAccountCode" [width]="200" [allowSorting]="false"
+    editCellTemplate="accCodeDownBoxEditor">
+    <dxo-lookup [dataSource]="erpAccounts" displayExpr="accountName" valueExpr="accountCode">
+    </dxo-lookup>
+  </dxi-column>
+
+  <dxi-column hidingPriority="1" dataField="erpGlAccountCode" [width]="200" [allowSorting]="false"
+    editCellTemplate="glCodeDropDownBoxEditor">
+    <dxo-lookup [dataSource]="erpGlAccounts" displayExpr="glName" valueExpr="glCode">
+    </dxo-lookup>
+  </dxi-column>
+
+  <dxi-column hidingPriority="0" type="buttons" [width]="70" caption="Apps" cellTemplate="cellTemplate"></dxi-column>
+
+
+  <div *dxTemplate="let data of 'cellTemplate'" style="display: flex; align-items: center; justify-content: center;">
+    <span title="Cari Hesabı Sil" class="link-icon" (click)="Unlink(data)">
+      <span class="material-icons" style="font-size: 16px;">
+        link_off
+      </span>
+    </span>&nbsp;
+    <span title="Manuel İşlendi Yap" class="link-icon" (click)="setStatus(data, 'manual')">
+      <span class="material-icons" style="font-size: 16px;">
+        check_circle
+      </span>
+    </span>
+  &nbsp;
+  <span title="Tekrar Dene" class="link-icon" (click)="setStatus(data, 'waiting')">
+    <span class="material-icons" style="font-size: 16px;">
+      send
+    </span>
+  </span>
+  &nbsp;
+  <t-grid-account-balance-button
+    [erpCompany]="getSelectedCompany(data.data)"
+    [erpId]="data.data.erpAccountCode"
+  ></t-grid-account-balance-button>
+  </div>
+
+  <div *dxTemplate="let cellInfo of 'glCodeDropDownBoxEditor'">
+    <dx-drop-down-box [dropDownOptions]="dropDownOptions" [dataSource]="erpGlAccounts"
+      [(value)]="cellInfo.value" displayExpr="glName" valueExpr="glCode" keyExpr="glCode"
+      contentTemplate="contentTemplate">
+      <div *dxTemplate="let e of 'contentTemplate'">
+        <dx-data-grid [dataSource]="erpGlAccounts" [remoteOperations]="true" [height]="250"
+          keyExpr="glCode" [selectedRowKeys]="[cellInfo.value]" [focusedRowEnabled]="true"
+          [focusedRowKey]="cellInfo.value" [hoverStateEnabled]="true"
+          (onSelectionChanged)="onSelectionChanged($event.selectedRowKeys, cellInfo, e.component)">
+          <dxi-column width="100" dataField="glCode"></dxi-column>
+          <dxi-column dataField="glName"></dxi-column>
+          <dxo-paging [enabled]="true" [pageSize]="10"></dxo-paging>
+          <dxo-scrolling mode="virtual"></dxo-scrolling>
+          <dxo-selection mode="single"></dxo-selection>
+          <dxo-search-panel [visible]="true" [width]="240" placeholder="Ara..."></dxo-search-panel>
+        </dx-data-grid>
+      </div>
+    </dx-drop-down-box>
+  </div>
+
+
+
+
+  <div *dxTemplate="let cellInfo of 'accCodeDownBoxEditor'">
+    <dx-drop-down-box [dropDownOptions]="dropDownOptions" [dataSource]="erpAccounts"
+      [(value)]="cellInfo.value" displayExpr="accountName" valueExpr="accountCode" keyExpr="accountCode"
+      contentTemplate="contentTemplate">
+      <div *dxTemplate="let e of 'contentTemplate'">
+        <dx-data-grid [dataSource]="erpAccounts" [remoteOperations]="true" [height]="250"
+          keyExpr="accountCode" [selectedRowKeys]="[cellInfo.value]" [focusedRowEnabled]="true"
+          [focusedRowKey]="cellInfo.value" [hoverStateEnabled]="true"
+          (onSelectionChanged)="onSelectionChanged($event.selectedRowKeys, cellInfo, e.component)">
+          <dxi-column dataField="accountCode"></dxi-column>
+          <dxi-column dataField="accountName"></dxi-column>
+          <dxo-paging [enabled]="true" [pageSize]="10"></dxo-paging>
+          <dxo-scrolling mode="virtual"></dxo-scrolling>
+
+          <dxo-selection mode="single"></dxo-selection>
+          <dxo-search-panel [visible]="true" placeholder="Ara..."></dxo-search-panel>
+        </dx-data-grid>
+      </div>
+    </dx-drop-down-box>
+  </div>
+
+
+  <dxo-summary>
+    <dxi-total-item column="amount" summaryType="sum" valueFormat="#,###.00" displayFormat="{0}">
+    </dxi-total-item>
+  </dxo-summary>
+
+</dx-data-grid>

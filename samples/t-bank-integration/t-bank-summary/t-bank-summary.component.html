@@ -1,0 +1,51 @@
+<div class="bank-summary-container">
+  <div class="summary-header">
+    <h3>Banka Özeti @if (filteredTransactions.length > 0) {
+      <span class="transaction-count">({{filteredTransactions.length}} işlem)</span>
+    }</h3>
+    <div class="total-amounts">
+      <div class="total-item">
+        <span class="label">Toplam Giren:</span>
+        <span class="amount inflow">{{totalInflow | number:'1.2-2'}} ₺</span>
+      </div>
+      <div class="total-item">
+        <span class="label">Toplam Çıkan:</span>
+        <span class="amount outflow">{{totalOutflow | number:'1.2-2'}} ₺</span>
+      </div>
+      <div class="total-item">
+        <span class="label">Net Bakiye:</span>
+        <span class="amount" [ngClass]="totalBalance >= 0 ? 'inflow' : 'outflow'">{{totalBalance | number:'1.2-2'}} ₺</span>
+      </div>
+    </div>
+  </div>
+
+  @if (bankSummaries.length === 0) {
+    <div class="no-data-message">
+      Seçilen tarih aralığında gösterilecek veri bulunamadı.
+    </div>
+  }
+
+  @if (bankSummaries.length > 0) {
+    <div class="bank-cards-container">
+      @for (bank of bankSummaries; track bank) {
+        <div class="bank-card">
+          <div class="bank-name">{{bank.bankAccName}}</div>
+          <div class="bank-amounts">
+            <div class="amount-row">
+              <span class="label">Giren:</span>
+              <span class="amount inflow">{{bank.inflow | number:'1.2-2'}} ₺</span>
+            </div>
+            <div class="amount-row">
+              <span class="label">Çıkan:</span>
+              <span class="amount outflow">{{bank.outflow | number:'1.2-2'}} ₺</span>
+            </div>
+            <div class="amount-row">
+              <span class="label">Bakiye:</span>
+              <span class="amount" [ngClass]="bank.balance >= 0 ? 'inflow' : 'outflow'">{{bank.balance | number:'1.2-2'}} ₺</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
