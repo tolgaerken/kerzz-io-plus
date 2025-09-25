@@ -64,4 +64,5 @@ export interface NotificationSettings {
   vibration: boolean;
   badge: boolean;
   inApp: boolean;
+  autoRedirect: boolean; // Uygulama açıkken otomatik yönlendirme yapılsın mı?
 }

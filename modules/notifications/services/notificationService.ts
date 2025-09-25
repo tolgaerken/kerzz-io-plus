@@ -583,6 +583,7 @@ class NotificationService {
         vibration: true,
         badge: true,
         inApp: true,
+        autoRedirect: false, // Varsayılan olarak kullanıcıya sor
       };
     } catch (error) {
       console.error('Ayarları okuma hatası:', error);
@@ -592,6 +593,7 @@ class NotificationService {
         vibration: true,
         badge: true,
         inApp: true,
+        autoRedirect: false, // Varsayılan olarak kullanıcıya sor
       };
     }
   }
@@ -1172,6 +1174,36 @@ class NotificationService {
   }
 
   /**
+   * Kullanıcının otomatik yönlendirme ayarını kontrol et
+   */
+  private async shouldAutoRedirect(): Promise<boolean> {
+    try {
+      const settings = await this.getSettings();
+      return settings.autoRedirect;
+    } catch (error) {
+      console.error('❌ Ayar kontrolü hatası:', error);
+      return false; // Hata durumunda güvenli taraf - kullanıcıya sor
+    }
+  }
+
+  /**
+   * Otomatik yönlendirme ayarını değiştir
+   */
+  async setAutoRedirect(enabled: boolean): Promise<void> {
+    try {
+      const currentSettings = await this.getSettings();
+      const newSettings = {
+        ...currentSettings,
+        autoRedirect: enabled
+      };
+      await this.saveSettings(newSettings);
+      console.log(`✅ Otomatik yönlendirme ayarı güncellendi: ${enabled ? 'Aktif' : 'Pasif'}`);
+    } catch (error) {
+      console.error('❌ Otomatik yönlendirme ayarı güncelleme hatası:', error);
+    }
+  }
+
+  /**
    * Notification handler - bildirime tıklandığında veya alındığında çalışır
    */
   async handleNotification(remoteMessage: any, isAppOpen: boolean = true): Promise<void> {
@@ -1363,21 +1395,13 @@ class NotificationService {
       });
 
       if (isAppOpen) {
-        // Uygulama açıkken - mevcut sayfayı kontrol et
-        try {
-          const { router } = await import('expo-router');
-          const currentRoute = router.canGoBack() ? 'unknown' : 'root';
-          
-          console.log('📍 Mevcut route bilgisi:', { currentRoute });
-          
-          // Eğer zaten sales sayfasındaysak direkt arama yap, değilse dialog göster
-          // Router state'i tam olarak alamadığımız için şimdilik her zaman direkt navigation yapalım
-          console.log('🚀 Foreground notification - direkt sales sayfasına yönlendiriliyor');
+        // Uygulama açıkken - ayara göre karar ver
+        const shouldAutoRedirect = await this.shouldAutoRedirect();
+        if (shouldAutoRedirect) {
+          console.log('🚀 Foreground notification - otomatik yönlendirme (ayar aktif)');
           await this.navigateToSale(searchQuery);
-          
-        } catch (routerError) {
-          console.error('❌ Router import hatası, dialog gösteriliyor:', routerError);
-          // Router hatası varsa dialog göster
+        } else {
+          console.log('🚀 Foreground notification - kullanıcıya onay soruluyor (ayar pasif)');
           await this.showSaleNavigationDialog(parsedData, searchQuery);
         }
       } else {
@@ -1469,16 +1493,17 @@ class NotificationService {
       });
 
       if (isAppOpen) {
-        // Uygulama açıkken - direkt navigation yap
-        try {
-          console.log('🚀 Foreground opportunity notification - direkt opportunities sayfasına yönlendiriliyor');
+        // Uygulama açıkken - ayara göre karar ver
+        const shouldAutoRedirect = await this.shouldAutoRedirect();
+        if (shouldAutoRedirect) {
+          console.log('🚀 Foreground opportunity notification - otomatik yönlendirme (ayar aktif)');
           await this.navigateToOpportunity(searchQuery);
-        } catch (routerError) {
-          console.error('❌ Router import hatası, dialog gösteriliyor:', routerError);
-          // Router hatası varsa dialog göster
+        } else {
+          console.log('🚀 Foreground opportunity notification - kullanıcıya onay soruluyor (ayar pasif)');
           await this.showOpportunityNavigationDialog(searchQuery, parsedData);
         }
       } else {
+        // Uygulama kapalıyken direkt yönlendir
         await this.navigateToOpportunity(searchQuery);
       }
     } catch (error) {
@@ -1761,13 +1786,13 @@ class NotificationService {
       });
 
       if (isAppOpen) {
-        // Uygulama açıkken - direkt navigation yap
-        try {
-          console.log('🚀 Foreground bank transaction notification - direkt bank-transactions sayfasına yönlendiriliyor');
+        // Uygulama açıkken - ayara göre karar ver
+        const shouldAutoRedirect = await this.shouldAutoRedirect();
+        if (shouldAutoRedirect) {
+          console.log('🚀 Foreground bank transaction notification - otomatik yönlendirme (ayar aktif)');
           await this.navigateToBankTransactionsList(transactionId);
-        } catch (routerError) {
-          console.error('❌ Router import hatası, dialog gösteriliyor:', routerError);
-          // Router hatası varsa dialog göster
+        } else {
+          console.log('🚀 Foreground bank transaction notification - kullanıcıya onay soruluyor (ayar pasif)');
           await this.showBankTransactionNavigationDialog(parsedData);
         }
       } else {
@@ -1799,7 +1824,10 @@ class NotificationService {
           const userConfirmed = canConfirm ? confirm(`${title}\n\n${message}`) : true;
           if (userConfirmed) {
             console.log('📱 Kullanıcı banka hareketi yönlendirmesini onayladı (web)');
-            await this.navigateToBankTransaction(transactionData);
+            const transactionId = transactionData?.id || transactionData?._id;
+            if (transactionId) {
+              await this.navigateToBankTransactionsList(transactionId);
+            }
           } else {
             console.log('📱 Kullanıcı banka hareketi yönlendirmesini iptal etti (web)');
           }
@@ -1822,7 +1850,10 @@ class NotificationService {
                   text: 'Görüntüle',
                   onPress: async () => {
                     console.log('📱 Kullanıcı banka hareketi yönlendirmesini onayladı');
-                    await this.navigateToBankTransaction(transactionData);
+                    const transactionId = transactionData?.id || transactionData?._id;
+                    if (transactionId) {
+                      await this.navigateToBankTransactionsList(transactionId);
+                    }
                     resolve();
                   }
                 }
@@ -1830,13 +1861,19 @@ class NotificationService {
             );
           } catch (importError) {
             console.error('❌ Alert import hatası:', importError);
-            await this.navigateToBankTransaction(transactionData);
+            const transactionId = transactionData?.id || transactionData?._id;
+            if (transactionId) {
+              await this.navigateToBankTransactionsList(transactionId);
+            }
             resolve();
           }
         }
       } catch (error) {
         console.error('❌ Banka hareketi dialog gösterme hatası:', error);
-        await this.navigateToBankTransaction(transactionData);
+        const transactionId = transactionData?.id || transactionData?._id;
+        if (transactionId) {
+          await this.navigateToBankTransactionsList(transactionId);
+        }
         resolve();
       }
     });
@@ -2203,9 +2240,20 @@ class NotificationService {
     console.log('  • timestamp: Log zamanı');
     console.log('');
     console.log('🎯 Test için push notification gönderin ve console\'ı kontrol edin!');
-    console.log('🧪 Sale Test için: NotificationService.getInstance().testNotificationHandler("12345", true/false)');
-    console.log('🧪 Opportunity Test için: NotificationService.getInstance().testOpportunityNotificationHandler("67890", true/false, "wrong-format")');
-    console.log('🧪 Bank Transaction Test için: NotificationService.getInstance().testBankTransactionNotificationHandler("tx-12345", true/false, "complex-json")');
+    console.log('');
+    console.log('⚙️ Otomatik Yönlendirme Ayarları:');
+    console.log('   NotificationService.getInstance().setAutoRedirect(true)  // Otomatik yönlendir');
+    console.log('   NotificationService.getInstance().setAutoRedirect(false) // Kullanıcıya sor (varsayılan)');
+    console.log('');
+    console.log('🧪 Test Fonksiyonları:');
+    console.log('   Sale Test: NotificationService.getInstance().testNotificationHandler("12345", true/false)');
+    console.log('   Opportunity Test: NotificationService.getInstance().testOpportunityNotificationHandler("67890", true/false)');
+    console.log('   Bank Transaction Test: NotificationService.getInstance().testBankTransactionNotificationHandler("tx-12345", true/false)');
+    console.log('');
+    console.log('📱 Davranış:');
+    console.log('   - isAppOpen=true + autoRedirect=false: Kullanıcıya onay sorar');
+    console.log('   - isAppOpen=true + autoRedirect=true: Direkt yönlendirir');
+    console.log('   - isAppOpen=false: Her zaman direkt yönlendirir');
   }
 }
 
