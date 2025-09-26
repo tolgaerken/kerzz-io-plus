@@ -8,6 +8,27 @@ import {
   NotificationSettings
 } from '../types';
 
+// Debug data interface
+interface NotificationDebugData {
+  id: string;
+  timestamp: string;
+  type: 'foreground' | 'background' | 'initial';
+  platform: string;
+  rawData: any;
+  parsedData?: any;
+  module?: string;
+  fullDocument?: any;
+  notification?: {
+    title?: string;
+    body?: string;
+  };
+  data?: any;
+  from?: string;
+  messageId?: string;
+  sentTime?: number;
+  ttl?: number;
+}
+
 // Platform-specific imports
 let notificationFunctions: any = {};
 
@@ -444,6 +465,9 @@ class NotificationService {
       notificationKeys: remoteMessage.notification ? Object.keys(remoteMessage.notification) : []
     });
     
+    // Debug data kaydet
+    this.saveDebugData(remoteMessage, 'foreground');
+    
     // Yeni notification handler'ı çağır (uygulama açık)
     this.handleNotification(remoteMessage, true);
     
@@ -468,6 +492,9 @@ class NotificationService {
       dataKeys: remoteMessage.data ? Object.keys(remoteMessage.data) : [],
       notificationKeys: remoteMessage.notification ? Object.keys(remoteMessage.notification) : []
     });
+    
+    // Debug data kaydet
+    this.saveDebugData(remoteMessage, 'background');
     
     // Yeni notification handler'ı çağır (uygulama kapalı)
     this.handleNotification(remoteMessage, false);
@@ -700,6 +727,9 @@ class NotificationService {
           hasData: !!remoteMessage.data,
           dataKeys: remoteMessage.data ? Object.keys(remoteMessage.data) : []
         });
+        
+        // Debug data kaydet
+        this.saveDebugData(remoteMessage, 'initial');
         
         // Initial notification handler'ı çağır (uygulama kapalıyken açıldı)
         this.handleNotification(remoteMessage, false);
@@ -2215,6 +2245,122 @@ class NotificationService {
     });
 
     console.log('=====================================');
+  }
+
+  /**
+   * Debug data kaydet
+   */
+  private async saveDebugData(remoteMessage: any, type: 'foreground' | 'background' | 'initial'): Promise<void> {
+    try {
+      const debugData: NotificationDebugData = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        type,
+        platform: Platform.OS,
+        rawData: remoteMessage,
+        notification: remoteMessage.notification,
+        data: remoteMessage.data,
+        from: remoteMessage.from,
+        messageId: remoteMessage.messageId,
+        sentTime: remoteMessage.sentTime,
+        ttl: remoteMessage.ttl,
+      };
+
+      // Data içinden module ve fullDocument'ı çıkar
+      if (remoteMessage.data) {
+        debugData.module = remoteMessage.data.module;
+        debugData.fullDocument = remoteMessage.data.fullDocument;
+        
+        // Parsed data'yı da kaydet
+        if (remoteMessage.data.fullDocument) {
+          try {
+            let parsedDocument = remoteMessage.data.fullDocument;
+            
+            // String ise parse etmeye çalış
+            if (typeof parsedDocument === 'string') {
+              // Çoklu JSON parse (escape karakterleri için)
+              let parseAttempts = 0;
+              const maxAttempts = 5;
+              
+              while (typeof parsedDocument === 'string' && parseAttempts < maxAttempts) {
+                try {
+                  parsedDocument = JSON.parse(parsedDocument);
+                  parseAttempts++;
+                } catch {
+                  break;
+                }
+              }
+            }
+            
+            debugData.parsedData = parsedDocument;
+          } catch (error) {
+            console.error('❌ Debug data parse hatası:', error);
+          }
+        }
+      }
+
+      // Mevcut debug verilerini al
+      const existingDataString = await AsyncStorage.getItem('notification_debug_data');
+      let existingData: NotificationDebugData[] = [];
+      
+      if (existingDataString) {
+        try {
+          existingData = JSON.parse(existingDataString);
+        } catch (error) {
+          console.error('❌ Mevcut debug data parse hatası:', error);
+          existingData = [];
+        }
+      }
+
+      // Yeni veriyi ekle (en başa)
+      existingData.unshift(debugData);
+
+      // Maksimum 100 kayıt tut (performans için)
+      if (existingData.length > 100) {
+        existingData = existingData.slice(0, 100);
+      }
+
+      // Kaydet
+      await AsyncStorage.setItem('notification_debug_data', JSON.stringify(existingData));
+      
+      console.log('💾 Debug data kaydedildi:', {
+        id: debugData.id,
+        type: debugData.type,
+        module: debugData.module,
+        hasFullDocument: !!debugData.fullDocument,
+        totalRecords: existingData.length
+      });
+    } catch (error) {
+      console.error('❌ Debug data kaydetme hatası:', error);
+    }
+  }
+
+  /**
+   * Debug verilerini temizle
+   */
+  async clearDebugData(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem('notification_debug_data');
+      console.log('✅ Debug verileri temizlendi');
+    } catch (error) {
+      console.error('❌ Debug verileri temizleme hatası:', error);
+    }
+  }
+
+  /**
+   * Debug verilerini al
+   */
+  async getDebugData(): Promise<NotificationDebugData[]> {
+    try {
+      const dataString = await AsyncStorage.getItem('notification_debug_data');
+      if (dataString) {
+        return JSON.parse(dataString);
+      }
+      return [];
+    } catch (error) {
+      console.error('❌ Debug verileri alma hatası:', error);
+      return [];
+    }
   }
 
   /**

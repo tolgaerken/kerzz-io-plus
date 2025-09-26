@@ -106,6 +106,15 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="notification-debugger"
+          options={{
+            title: 'Notification Debug',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="bell.badge.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="sale-detail"
           options={{
             title: 'Satış Detayı',
