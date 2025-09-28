@@ -4,21 +4,21 @@
     "slug": "kerzz-io-plus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./logos/ios/Icon-1024.png",
     "scheme": "kerzzioplus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kerzz.kerzz-io",
+      "bundleIdentifier": "com.kerzz.kerzz_io",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./logos/android/ic_launcher_192.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "monochromeImage": "./logos/android/ic_launcher_192.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -27,7 +27,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./logos/ios/Icon-1024.png"
     },
     "plugins": [
       "expo-router",
@@ -47,7 +47,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./logos/ios/Icon-1024.png",
           "color": "#3B82F6",
           "defaultChannel": "default",
           "sounds": []
@@ -61,7 +61,7 @@
       ]
     ],
     "notification": {
-      "icon": "./assets/images/icon.png",
+      "icon": "./logos/ios/Icon-1024.png",
       "color": "#3B82F6"
     },
     "experiments": {

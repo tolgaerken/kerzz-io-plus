@@ -1,4 +1,5 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { isFirebaseInitialized } from '../../../config/firebase';
 import { useNotificationStore } from '../stores/notificationStore';
 import { NotificationSettings } from '../types';
 
@@ -24,9 +25,9 @@ export const useNotifications = () => {
     setBadgeCount,
   } = useNotificationStore();
 
-  // Initialize notification system on mount
+  // Initialize notification system when Firebase is ready
   useEffect(() => {
-    if (!isInitialized) {
+    if (!isInitialized && isFirebaseInitialized()) {
       initialize();
     }
   }, [isInitialized, initialize]);

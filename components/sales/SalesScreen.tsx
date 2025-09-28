@@ -3,7 +3,9 @@ import { useAuthStore } from '@modules/auth';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { useMessagesQuery } from '../../modules/data-layer/hooks/useMessagesQuery';
 import { useSalesQuery } from '../../modules/data-layer/hooks/useSalesQuery';
+import NotificationService from '../../modules/notifications/services/notificationService';
 import { useStyles } from '../../modules/theme';
 import { TSale } from '../../types/dto';
 import { ThemedText } from '../themed-text';
@@ -44,6 +46,23 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
   const { user } = useAuthStore();
 
   const salesQuery = useSalesQuery();
+  const messagesQuery = useMessagesQuery();
+  const createMessageMutation = messagesQuery.useCreateMessage();
+  
+  // Notification ile form açılma durumu
+  const [isOpenedFromNotification, setIsOpenedFromNotification] = useState(false);
+  const [notificationFromUserId, setNotificationFromUserId] = useState<string | null>(null);
+  
+  // Ref'ler ile mevcut değerleri takip et (cleanup için)
+  const approvedSalesRef = useRef<TSale[]>([]);
+  const isOpenedFromNotificationRef = useRef(false);
+  const notificationFromUserIdRef = useRef<string | null>(null);
+  const createMessageMutationRef = useRef(createMessageMutation);
+  
+  // Ref'leri güncel tut
+  useEffect(() => {
+    createMessageMutationRef.current = createMessageMutation;
+  }, [createMessageMutation]);
   
   // Seçilen ay/yıl için satışları ve istatistikleri getir (arama modunda devre dışı)
   const salesStatsQuery = salesQuery.useSalesStats(selectedYear, selectedMonth, {
@@ -53,6 +72,102 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
   // Mutation hook'ları
   const approveSaleMutation = salesQuery.useApproveSale();
   const approveInvoiceMutation = salesQuery.useApproveInvoice();
+
+  // Notification'dan gelen fromUserId'yi kontrol et
+  useEffect(() => {
+    const checkNotificationFromUserId = async () => {
+      try {
+        const notificationService = NotificationService.getInstance();
+        const fromUserId = await notificationService.getNotificationFromUserId();
+        
+        console.log('🔍 Notification fromUserId kontrolü:', {
+          fromUserId,
+          hasFromUserId: !!fromUserId,
+          initialSearchQuery
+        });
+        
+        if (fromUserId) {
+          setIsOpenedFromNotification(true);
+          setNotificationFromUserId(fromUserId);
+          // Ref'leri de güncelle
+          isOpenedFromNotificationRef.current = true;
+          notificationFromUserIdRef.current = fromUserId;
+          console.log('📱 Form notification ile açıldı, fromUserId:', fromUserId);
+        } else {
+          console.log('ℹ️ Form normal şekilde açıldı (notification ile değil)');
+        }
+      } catch (error) {
+        console.error('❌ Notification fromUserId kontrolü hatası:', error);
+      }
+    };
+
+    checkNotificationFromUserId();
+
+    // Cleanup: Sayfa çıkışında fromUserId'yi temizle
+    return () => {
+      const isFromNotification = isOpenedFromNotificationRef.current;
+      const fromUserId = notificationFromUserIdRef.current;
+      
+      if (isFromNotification && fromUserId) {
+        const cleanupNotificationData = async () => {
+          try {
+            const notificationService = NotificationService.getInstance();
+            await notificationService.clearNotificationFromUserId();
+            console.log('🧹 Sayfa çıkışında fromUserId temizlendi');
+          } catch (error) {
+            console.error('❌ Cleanup fromUserId hatası:', error);
+          }
+        };
+        cleanupNotificationData();
+      }
+    };
+  }, [initialSearchQuery]);
+
+  // Sayfa çıkışında özet mesaj gönder (sadece birden fazla satış onaylandıysa)
+  useEffect(() => {
+    // Component unmount olduğunda özet mesaj gönder
+    return () => {
+      const sendSummaryMessage = async () => {
+        const approvedSales = approvedSalesRef.current;
+        const isFromNotification = isOpenedFromNotificationRef.current;
+        const fromUserId = notificationFromUserIdRef.current;
+        
+        if (isFromNotification && fromUserId && approvedSales.length > 1) {
+          try {
+            console.log('📊 Özet mesaj gönderiliyor:', {
+              count: approvedSales.length,
+              sales: approvedSales.map(s => s.no)
+            });
+
+            const summaryContent = `${approvedSales.length} satış onaylandı: ${approvedSales.map(s => s.no).join(', ')}`;
+            
+            const summaryMessageInput = {
+              content: summaryContent,
+              type: 'private' as const,
+              targetUsers: [fromUserId],
+              priority: 'medium' as const,
+              importance: 'normal' as const,
+              hasSound: false,
+              references: approvedSales.map(sale => ({
+                type: 'record' as const,
+                collection: 'sales',
+                recordId: sale.id!,
+                displayText: `Satış: ${sale.no}`,
+                route: `/(drawer)/sale-detail?saleId=${sale.id}`
+              }))
+            };
+
+            await createMessageMutationRef.current.mutateAsync(summaryMessageInput);
+            console.log('✅ Özet mesaj gönderildi');
+          } catch (summaryError) {
+            console.error('❌ Özet mesaj gönderme hatası:', summaryError);
+          }
+        }
+      };
+      
+      sendSummaryMessage();
+    };
+  }, []); // Boş dependency array - sadece unmount'ta çalışsın
 
   // Loading state helper fonksiyonları
   const setApproveLoading = useCallback((saleId: string, loading: boolean) => {
@@ -272,7 +387,7 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
     approveSaleMutation.mutate(
       { id: sale.id!, data: updateData },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           setApproveLoading(sale.id!, false);
           // Arama sonuçları gösteriliyorsa yerel listeyi güncelle
           setSearchResults(prev =>
@@ -281,6 +396,57 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
               : prev
           );
           console.log('✅ Satış onayı güncellendi:', sale.approved ? 'Onay kaldırıldı' : 'Onaylandı');
+          
+          // Eğer notification ile form açıldı ise ve satış onaylandı ise mesaj gönder
+          if (isOpenedFromNotification && notificationFromUserId && !sale.approved && user) {
+            try {
+              console.log('📨 Satış onay mesajı gönderiliyor:', {
+                fromUserId: notificationFromUserId,
+                currentUserId: user.id,
+                saleNo: sale.no,
+                company: sale.company,
+                saleApproved: sale.approved,
+                isOpenedFromNotification,
+                conditions: {
+                  isOpenedFromNotification,
+                  hasNotificationFromUserId: !!notificationFromUserId,
+                  saleWasNotApproved: !sale.approved,
+                  hasUser: !!user
+                }
+              });
+              
+              // Mesaj input'unu oluştur
+              const messageInput = messagesQuery.createSaleApprovalMessageInput(
+                notificationFromUserId,
+                sale
+              );
+              
+              // Mesajı gönder
+              await createMessageMutation.mutateAsync(messageInput);
+              
+              console.log('✅ Satış onay mesajı başarıyla gönderildi');
+              
+              // Onaylanan satışı listeye ekle
+              const currentApprovedSales = approvedSalesRef.current;
+              const isAlreadyAdded = currentApprovedSales.some(s => s.id === sale.id);
+              if (!isAlreadyAdded) {
+                const newList = [...currentApprovedSales, sale];
+                approvedSalesRef.current = newList;
+                console.log('📊 Bu oturumda onaylanan satışlar:', {
+                  count: newList.length,
+                  sales: newList.map(s => ({ no: s.no, company: s.company }))
+                });
+              }
+              
+              // FromUserId'yi temizleme - her satış için değil, sayfa çıkışında yapılacak
+              // Bu sayede birden fazla satış onaylandığında hepsi için mesaj gönderilir
+              
+            } catch (messageError) {
+              console.error('❌ Satış onay mesajı gönderme hatası:', messageError);
+              // Hata durumunda kullanıcıya bilgi ver
+              Alert.alert('Uyarı', 'Onay mesajı gönderilemedi, ancak satış başarıyla onaylandı.');
+            }
+          }
         },
         onError: (error: any) => {
           setApproveLoading(sale.id!, false);
@@ -288,7 +454,8 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
         },
       }
     );
-  }, [user, approveSaleMutation, setApproveLoading]);
+
+  }, [user, approveSaleMutation, setApproveLoading, isOpenedFromNotification, notificationFromUserId, createMessageMutation, messagesQuery, showSearchResults]);
 
   const handleInvoiceApprove = useCallback((sale: TSale) => {
     if (!sale.id) {
@@ -325,7 +492,7 @@ export function SalesScreen({ initialSearchQuery }: SalesScreenProps = {}) {
         },
       }
     );
-  }, [user, approveInvoiceMutation, setInvoiceApproveLoading]);
+  }, [user, approveInvoiceMutation, setInvoiceApproveLoading, showSearchResults]);
 
 
   const renderSaleCard = (sale: TSale) => {

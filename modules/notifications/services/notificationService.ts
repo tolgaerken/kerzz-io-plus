@@ -57,6 +57,9 @@ const loadFirebaseFunctions = async () => {
         getInitialNotification: firebaseMessaging.getInitialNotification,
         getMessaging: firebaseMessaging.getMessaging,
         getToken: firebaseMessaging.getToken,
+        getAPNSToken: firebaseMessaging.getAPNSToken,
+        setAPNSToken: firebaseMessaging.setAPNSToken,
+        registerDeviceForRemoteMessages: firebaseMessaging.registerDeviceForRemoteMessages,
         onMessage: firebaseMessaging.onMessage,
         onTokenRefresh: firebaseMessaging.onTokenRefresh,
         requestPermission: firebaseMessaging.requestPermission,
@@ -90,6 +93,8 @@ class NotificationService {
 
   private constructor() {
     this.initializeMessaging();
+    // Test fonksiyonlarını setup et
+    NotificationService.setupConsoleTest();
   }
 
   private async initializeMessaging() {
@@ -253,6 +258,13 @@ class NotificationService {
    */
   async getToken(): Promise<string | null> {
     try {
+      console.log('🔍 FCM Token alma işlemi başlatılıyor...', { 
+        platform: Platform.OS,
+        isFirebaseInitialized: isFirebaseInitialized(),
+        hasMessaging: !!this.messaging,
+        hasGetTokenFunction: !!notificationFunctions.getToken
+      });
+
       // Web platformu için
       if (Platform.OS === 'web') {
         const permission = await this.requestPermissions();
@@ -274,11 +286,39 @@ class NotificationService {
         return token;
       }
 
-      // React Native platformları için
-      if (!isFirebaseInitialized() || !this.messaging) {
+      // React Native platformları için - detaylı debug
+      console.log('🔍 Firebase durumu kontrol ediliyor...');
+      if (!isFirebaseInitialized()) {
         console.error('❌ Firebase App başlatılmamış');
-        return null;
+        console.log('🔧 Firebase başlatma deneniyor...');
+        
+        try {
+          const { initializeFirebase } = await import('../../../config/firebase');
+          const initialized = await initializeFirebase();
+          console.log('🔧 Firebase başlatma sonucu:', initialized);
+          
+          if (!initialized) {
+            console.error('❌ Firebase başlatılamadı');
+            return null;
+          }
+        } catch (initError) {
+          console.error('❌ Firebase başlatma hatası:', initError);
+          return null;
+        }
       }
+
+      if (!this.messaging) {
+        console.error('❌ Messaging instance mevcut değil');
+        console.log('🔧 Messaging instance oluşturuluyor...');
+        await this.initializeMessaging();
+        
+        if (!this.messaging) {
+          console.error('❌ Messaging instance oluşturulamadı');
+          return null;
+        }
+      }
+
+      console.log('✅ Firebase ve Messaging hazır');
 
       const permission = await this.requestPermissions();
       console.log('🔍 Token alma - permission durumu:', permission);
@@ -289,23 +329,111 @@ class NotificationService {
 
       if (!notificationFunctions.getToken) {
         console.error('❌ Firebase getToken fonksiyonu yüklenemedi');
+        console.log('🔍 Mevcut notification functions:', Object.keys(notificationFunctions));
         return null;
       }
 
-      console.log('📱 FCM token alınıyor...', { platform: Platform.OS });
+      console.log('📱 FCM token alınıyor...', { 
+        platform: Platform.OS,
+        messagingInstance: !!this.messaging,
+        getTokenFunction: !!notificationFunctions.getToken
+      });
+
+      // iOS için APNS token kontrolü ve ayarlama
+      if (Platform.OS === 'ios') {
+        console.log('🍎 iOS için APNS token kontrolü yapılıyor...');
+        
+        try {
+          // iOS'ta remote messages için cihazı kaydet (APNS token üretimi için gerekli)
+          if (notificationFunctions.registerDeviceForRemoteMessages) {
+            try {
+              await notificationFunctions.registerDeviceForRemoteMessages(this.messaging);
+              console.log('🍎 registerDeviceForRemoteMessages çağrıldı');
+            } catch (regError) {
+              console.log('🍎 registerDeviceForRemoteMessages hatası:', regError instanceof Error ? regError.message : String(regError));
+            }
+          }
+
+          // APNS token'ı kontrol et
+          let apnsToken = null;
+          if (notificationFunctions.getAPNSToken) {
+            try {
+              apnsToken = await notificationFunctions.getAPNSToken(this.messaging);
+              console.log('🍎 Mevcut APNS Token:', apnsToken ? 'Var' : 'Yok');
+            } catch (apnsError) {
+              console.log('🍎 APNS Token alma hatası:', apnsError instanceof Error ? apnsError.message : String(apnsError));
+            }
+          }
+
+          // APNS token yoksa, iOS simülatör için özel işlem
+          if (!apnsToken) {
+            console.log('🍎 APNS Token henüz yok, iOS simülatörde test için setAPNSToken denenecek');
+            try {
+              // Sadece simülatörde sahte APNS token set et
+              if (!Device.isDevice && notificationFunctions.setAPNSToken) {
+                // 32-byte (64 hex char) sahte token üret
+                const fakeToken = 'a'.repeat(64);
+                await notificationFunctions.setAPNSToken(this.messaging, fakeToken);
+                console.log('🍎 setAPNSToken (fake) çağrıldı');
+                // Tekrar kontrol et
+                try {
+                  apnsToken = await notificationFunctions.getAPNSToken(this.messaging);
+                  console.log('🍎 set sonrası APNS Token:', apnsToken ? 'Var' : 'Yok');
+                } catch {}
+              } else {
+                console.log('🍎 Fiziksel cihaz ya da setAPNSToken mevcut değil, beklemeye geçiliyor');
+              }
+            } catch (setError) {
+              console.log('🍎 setAPNSToken hatası:', setError instanceof Error ? setError.message : String(setError));
+            }
+          }
+        } catch (apnsCheckError) {
+          console.log('🍎 APNS token kontrol hatası:', apnsCheckError instanceof Error ? apnsCheckError.message : String(apnsCheckError));
+        }
+      }
+      
       const token = await notificationFunctions.getToken(this.messaging);
-      console.log('📱 FCM token alındı:', { 
+      console.log('📱 FCM token alma sonucu:', { 
         hasToken: !!token, 
         tokenLength: token?.length || 0,
-        tokenPreview: token ? token.substring(0, 20) + '...' : null
+        tokenPreview: token ? token.substring(0, 20) + '...' : null,
+        tokenType: typeof token
       });
+
+      if (!token) {
+        console.error('❌ FCM token null döndü - detaylı debug:');
+        console.log('🔍 Messaging instance detayları:', {
+          messaging: this.messaging,
+          messagingType: typeof this.messaging,
+          messagingKeys: this.messaging ? Object.keys(this.messaging) : 'N/A'
+        });
+        
+        // APNs token kontrolü (iOS için)
+        if (Platform.OS === 'ios') {
+          try {
+            console.log('🍎 iOS APNs token kontrol ediliyor...');
+            const apnsToken = await notificationFunctions.getAPNSToken?.(this.messaging);
+            console.log('🍎 APNs token:', apnsToken ? 'Mevcut' : 'Yok');
+          } catch (apnsError) {
+            console.log('🍎 APNs token hatası:', apnsError);
+          }
+        }
+        
+        return null;
+      }
 
       this.currentToken = token;
       await this.saveTokenToStorage(token);
       
       return token;
     } catch (error) {
-      console.error('FCM token alma hatası:', error);
+      console.error('❌ FCM token alma hatası:', error);
+      console.error('❌ Hata detayları:', {
+        message: error instanceof Error ? error.message : String(error),
+        code: error && typeof error === 'object' && 'code' in error ? error.code : 'unknown',
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 3) : undefined
+      });
+      
       return null;
     }
   }
@@ -749,6 +877,7 @@ class NotificationService {
   getCurrentToken(): string | null {
     return this.currentToken;
   }
+
 
   /**
    * Satışçı atama bildirimi gönder
@@ -1234,6 +1363,100 @@ class NotificationService {
   }
 
   /**
+   * Notification'dan gelen fromUserId'yi sakla
+   */
+  async setNotificationFromUserId(fromUserId: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem('notification_from_user_id', fromUserId);
+      console.log('📤 Notification fromUserId kaydedildi:', fromUserId);
+    } catch (error) {
+      console.error('❌ Notification fromUserId kaydetme hatası:', error);
+    }
+  }
+
+  /**
+   * Saklanan fromUserId'yi al
+   */
+  async getNotificationFromUserId(): Promise<string | null> {
+    try {
+      const fromUserId = await AsyncStorage.getItem('notification_from_user_id');
+      return fromUserId;
+    } catch (error) {
+      console.error('❌ Notification fromUserId alma hatası:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Saklanan fromUserId'yi temizle
+   */
+  async clearNotificationFromUserId(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem('notification_from_user_id');
+      console.log('🗑️ Notification fromUserId temizlendi');
+    } catch (error) {
+      console.error('❌ Notification fromUserId temizleme hatası:', error);
+    }
+  }
+
+  /**
+   * Test için fromUserId set etme fonksiyonu
+   */
+  async testSetFromUserId(fromUserId: string): Promise<void> {
+    try {
+      await this.setNotificationFromUserId(fromUserId);
+      console.log('🧪 Test için fromUserId set edildi:', fromUserId);
+      
+      // Doğrulama için tekrar oku
+      const savedFromUserId = await this.getNotificationFromUserId();
+      console.log('🔍 Kaydedilen fromUserId doğrulaması:', {
+        setted: fromUserId,
+        saved: savedFromUserId,
+        isMatch: fromUserId === savedFromUserId
+      });
+    } catch (error) {
+      console.error('❌ Test fromUserId set etme hatası:', error);
+    }
+  }
+
+  /**
+   * Console'da test etmek için global fonksiyon
+   */
+  static setupConsoleTest(): void {
+    if (typeof window !== 'undefined') {
+      (window as any).testNotificationFromUserId = async (fromUserId: string) => {
+        const service = NotificationService.getInstance();
+        await service.testSetFromUserId(fromUserId);
+        console.log('✅ Test tamamlandı. Şimdi satış formuna gidin ve bir satışı onaylayın.');
+      };
+      
+      (window as any).checkNotificationFromUserId = async () => {
+        const service = NotificationService.getInstance();
+        const fromUserId = await service.getNotificationFromUserId();
+        console.log('🔍 Mevcut fromUserId:', fromUserId);
+        return fromUserId;
+      };
+      
+      (window as any).clearNotificationFromUserId = async () => {
+        const service = NotificationService.getInstance();
+        await service.clearNotificationFromUserId();
+        console.log('🗑️ FromUserId temizlendi');
+      };
+      
+      console.log('🧪 Test fonksiyonları hazır:');
+      console.log('- testNotificationFromUserId("user-id-123")');
+      console.log('- checkNotificationFromUserId()');
+      console.log('- clearNotificationFromUserId()');
+      console.log('');
+      console.log('💡 Birden fazla satış onayı testi için:');
+      console.log('1. testNotificationFromUserId("test-user-456")');
+      console.log('2. Satış formuna gidin');
+      console.log('3. Birden fazla satışı onaylayın');
+      console.log('4. Sayfadan çıkın (özet mesaj gönderilecek)');
+    }
+  }
+
+  /**
    * Notification handler - bildirime tıklandığında veya alındığında çalışır
    */
   async handleNotification(remoteMessage: any, isAppOpen: boolean = true): Promise<void> {
@@ -1243,6 +1466,12 @@ class NotificationService {
         hasData: !!remoteMessage?.data,
         dataKeys: remoteMessage?.data ? Object.keys(remoteMessage.data) : []
       });
+
+      // Notification data'dan fromUserId alanını çıkar ve global olarak sakla
+      if (remoteMessage?.data?.fromUserId) {
+        await this.setNotificationFromUserId(remoteMessage.data.fromUserId);
+        console.log('📤 Notification fromUserId kaydedildi:', remoteMessage.data.fromUserId);
+      }
 
       // Data varsa JSON'a çevir
       if (remoteMessage?.data) {
@@ -2361,6 +2590,140 @@ class NotificationService {
       console.error('❌ Debug verileri alma hatası:', error);
       return [];
     }
+  }
+
+  /**
+   * iOS Simülatör FCM Token Debug
+   */
+  async debugIOSSimulatorFCMToken(): Promise<void> {
+    if (Platform.OS !== 'ios') {
+      console.log('⚠️ Bu debug fonksiyonu sadece iOS için geçerlidir');
+      return;
+    }
+
+    console.log('🍎 iOS Simülatör FCM Token Debug Başlatılıyor...');
+    console.log('=====================================');
+
+    // 1. Platform ve ortam bilgileri
+    console.log('📱 Platform Bilgileri:', {
+      platform: Platform.OS,
+      version: Platform.Version,
+      isDev: __DEV__,
+      isHermes: typeof HermesInternal !== 'undefined'
+    });
+
+    // 2. Firebase durumu
+    console.log('🔥 Firebase Durumu:', {
+      isInitialized: isFirebaseInitialized(),
+      hasMessaging: !!this.messaging,
+      hasNotificationFunctions: !!notificationFunctions,
+      availableFunctions: Object.keys(notificationFunctions)
+    });
+
+    // 3. Notification functions detayları
+    console.log('🔧 Notification Functions Detayları:', {
+      getToken: !!notificationFunctions.getToken,
+      requestPermission: !!notificationFunctions.requestPermission,
+      onMessage: !!notificationFunctions.onMessage,
+      onTokenRefresh: !!notificationFunctions.onTokenRefresh,
+      AuthorizationStatus: !!notificationFunctions.AuthorizationStatus
+    });
+
+    // 4. Firebase modül yükleme durumu
+    try {
+      const firebaseApp = await import('@react-native-firebase/app');
+      const firebaseMessaging = await import('@react-native-firebase/messaging');
+      console.log('✅ Firebase modülleri başarıyla import edildi');
+      
+      // Apps kontrolü
+      const apps = firebaseApp.getApps();
+      console.log('📱 Firebase Apps:', {
+        count: apps.length,
+        names: apps.map(app => app.name)
+      });
+
+      // Messaging instance kontrolü
+      try {
+        const messaging = firebaseMessaging.getMessaging();
+        console.log('📨 Messaging Instance:', {
+          exists: !!messaging,
+          type: typeof messaging
+        });
+      } catch (msgError) {
+        console.error('❌ Messaging Instance Hatası:', msgError);
+      }
+
+    } catch (importError) {
+      console.error('❌ Firebase modül import hatası:', importError);
+    }
+
+    // 5. İzin durumu kontrol
+    try {
+      console.log('🔍 İzin durumu kontrol ediliyor...');
+      const permission = await this.requestPermissions();
+      console.log('📋 İzin Sonucu:', permission);
+    } catch (permError) {
+      console.error('❌ İzin kontrolü hatası:', permError);
+    }
+
+    // 6. Token alma denemesi
+    try {
+      console.log('🔑 Token alma denemesi...');
+      const token = await this.getToken();
+      console.log('🔑 Token Sonucu:', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+        tokenPreview: token ? token.substring(0, 30) + '...' : null
+      });
+    } catch (tokenError) {
+      console.error('❌ Token alma hatası:', tokenError);
+    }
+
+    // 7. APNs durumu (iOS özel)
+    try {
+      console.log('🍎 APNs durumu kontrol ediliyor...');
+      
+      // APNs token alma denemesi
+      if (notificationFunctions.getAPNSToken) {
+        try {
+          const apnsToken = await notificationFunctions.getAPNSToken(this.messaging);
+          console.log('🍎 APNs Token:', apnsToken ? 'Mevcut' : 'Yok');
+        } catch (apnsError) {
+          console.log('🍎 APNs Token Hatası:', apnsError instanceof Error ? apnsError.message : String(apnsError));
+        }
+      } else {
+        console.log('🍎 getAPNSToken fonksiyonu mevcut değil');
+      }
+
+      // iOS authorization status
+      if (notificationFunctions.requestPermission && notificationFunctions.AuthorizationStatus) {
+        try {
+          const authStatus = await notificationFunctions.requestPermission(this.messaging);
+          console.log('🍎 iOS Authorization Status:', {
+            status: authStatus,
+            AUTHORIZED: notificationFunctions.AuthorizationStatus.AUTHORIZED,
+            DENIED: notificationFunctions.AuthorizationStatus.DENIED,
+            NOT_DETERMINED: notificationFunctions.AuthorizationStatus.NOT_DETERMINED,
+            PROVISIONAL: notificationFunctions.AuthorizationStatus.PROVISIONAL
+          });
+        } catch (authError) {
+          console.log('🍎 Authorization Status Hatası:', authError instanceof Error ? authError.message : String(authError));
+        }
+      }
+
+    } catch (apnsError) {
+      console.error('❌ APNs kontrol hatası:', apnsError);
+    }
+
+    console.log('=====================================');
+    console.log('✅ iOS Simülatör FCM Token Debug Tamamlandı');
+    console.log('');
+    console.log('💡 Olası Çözümler:');
+    console.log('1. Fiziksel iOS cihazında test edin');
+    console.log('2. Firebase Console\'da APNs sertifikası kontrol edin');
+    console.log('3. Xcode\'da Push Notifications capability\'si ekli mi kontrol edin');
+    console.log('4. Bundle ID\'nin Firebase\'deki ile aynı olduğunu kontrol edin');
+    console.log('5. iOS Simulator Settings > Notifications > Your App > Allow Notifications');
   }
 
   /**

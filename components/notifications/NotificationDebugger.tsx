@@ -2,16 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import NotificationService from '../../modules/notifications/services/notificationService';
+import { quickSimulatorTest, testIOSSimulatorPushNotifications, testLocalNotificationOnly } from '../../modules/notifications/utils/simulatorTestHelper';
 
 interface NotificationDebugData {
   id: string;
@@ -80,6 +81,7 @@ const NotificationDebugger: React.FC = () => {
               setDebugData([]);
               Alert.alert('Başarılı', 'Debug verileri temizlendi');
             } catch (error) {
+              console.error('❌ Debug verileri temizlenemedi:', error);
               Alert.alert('Hata', 'Debug verileri temizlenemedi');
             }
           }
@@ -110,6 +112,55 @@ const NotificationDebugger: React.FC = () => {
         {
           text: 'Bank Transaction',
           onPress: () => NotificationService.getInstance().testBankTransactionNotificationHandler('tx-12345', true, 'complex-json')
+        }
+      ]
+    );
+  };
+
+  // iOS Simulator test çalıştır
+  const runSimulatorTest = () => {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Uyarı', 'Bu test sadece iOS için tasarlanmıştır.');
+      return;
+    }
+
+    Alert.alert(
+      'iOS Simulator Test',
+      'Hangi test türünü çalıştırmak istiyorsunuz?',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Hızlı Test',
+          onPress: async () => {
+            try {
+              await quickSimulatorTest();
+              Alert.alert('Başarılı', 'Hızlı test tamamlandı. Console\'ı kontrol edin.');
+            } catch (error) {
+              Alert.alert('Hata', 'Test sırasında hata oluştu: ' + error);
+            }
+          }
+        },
+        {
+          text: 'Kapsamlı Test',
+          onPress: async () => {
+            try {
+              await testIOSSimulatorPushNotifications();
+              Alert.alert('Başarılı', 'Kapsamlı test tamamlandı. Console\'ı kontrol edin.');
+            } catch (error) {
+              Alert.alert('Hata', 'Test sırasında hata oluştu: ' + error);
+            }
+          }
+        },
+        {
+          text: 'Sadece Local',
+          onPress: async () => {
+            try {
+              await testLocalNotificationOnly();
+              Alert.alert('Başarılı', 'Local notification test tamamlandı.');
+            } catch (error) {
+              Alert.alert('Hata', 'Test sırasında hata oluştu: ' + error);
+            }
+          }
         }
       ]
     );
@@ -290,6 +341,12 @@ const NotificationDebugger: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notification Debugger</Text>
         <View style={styles.headerButtons}>
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity style={styles.simulatorButton} onPress={runSimulatorTest}>
+              <Ionicons name="phone-portrait" size={16} color="#fff" />
+              <Text style={styles.buttonTextSmall}>Simulator</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.testButton} onPress={sendTestNotification}>
             <Ionicons name="flask" size={20} color="#fff" />
             <Text style={styles.buttonText}>Test</Text>
@@ -357,6 +414,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  simulatorButton: {
+    backgroundColor: '#FF9500',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 2,
+  },
   testButton: {
     backgroundColor: '#4CAF50',
     flexDirection: 'row',
@@ -378,6 +444,11 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  buttonTextSmall: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
   },
   stats: {
