@@ -29,7 +29,15 @@ console.log('FCM registration token: [Kopyaladığınız token]');
 console.log('\n🎯 Advanced Options (Opsiyonel):');
 console.log('- Android notification channel: "fcm_default_channel"');
 console.log('- Priority: "High"');
-console.log('- Sound: "default"');
+console.log('- Sound (Android/iOS): data.sound / apns.aps.sound');
+console.log('  Örnek sound değerleri: approve_request, money, new_oppo, notify1, notify2, notify3_money, notify4');
+console.log('\nÖrnek payload (FCM API):');
+console.log('{');
+console.log('  "to": "<DEVICE_FCM_TOKEN>",');
+console.log('  "notification": { "title": "Test Bildirimi", "body": "Bu bir test" },');
+console.log('  "data": { "sound": "new_oppo" },');
+console.log('  "apns": { "payload": { "aps": { "sound": "new_oppo" } } }');
+console.log('}');
 
 console.log('\n🔍 Debug Komutları:');
 console.log('# Gerçek zamanlı FCM logları:');

@@ -3,9 +3,9 @@ import * as Device from 'expo-device';
 import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import { isFirebaseInitialized } from '../../../config/firebase';
 import {
-  FCMToken,
-  NotificationPermission,
-  NotificationSettings
+    FCMToken,
+    NotificationPermission,
+    NotificationSettings
 } from '../types';
 
 // Debug data interface

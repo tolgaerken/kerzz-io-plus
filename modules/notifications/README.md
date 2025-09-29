@@ -14,6 +14,70 @@ Bu modül, React Native Expo uygulaması için kapsamlı bir push notification s
 - 🔗 Deep linking desteği
 - 🚀 Background ve foreground notification handling
 
+## Özel Bildirim Sesleri (Android + iOS)
+
+Uygulamaya özel sesler eklendi ve push notification'larda kullanılabilir:
+
+- Android: `res/raw` içine kopyalandı ve sesli kanallar oluşturuldu.
+- iOS: `ios/kerzzioplus/NotificationSounds/` klasörüne kopyalandı. Xcode'da projeye kaynak olarak ekli olduğundan emin olun (Target Membership: kerzzioplus).
+
+Desteklenen sesler (dosya adları):
+
+```
+approve_request.mp3
+money.mp3
+new_oppo.mp3
+notify1.mp3
+notify2.mp3
+notify3-money.mp3
+notify4.mp3
+```
+
+### Kullanım (FCM Payload)
+
+- Android: `data.sound` alanı verildiğinde uygun kanal otomatik seçilir ve kanalın sesi çalar.
+- iOS: `aps.sound` alanına dosya adı (`.mp3` uzantısı olmadan da verilebilir) yazılmalıdır.
+
+Örnek Android/iOS uyumlu FCM mesajı:
+
+```json
+{
+  "to": "<DEVICE_FCM_TOKEN>",
+  "notification": {
+    "title": "Yeni Fırsat",
+    "body": "Size yeni bir fırsat atandı"
+  },
+  "data": {
+    "module": "opportunity",
+    "fullDocument": "{\"id\":\"opp-1\",\"no\":\"10446\"}",
+    "sound": "new_oppo"
+  },
+  "apns": {
+    "payload": {
+      "aps": {
+        "sound": "new_oppo"
+      }
+    }
+  }
+}
+```
+
+Android'de `sound` → kanal eşleşmeleri:
+
+```
+approve_request -> sound_approve_request
+money           -> sound_money
+new_oppo        -> sound_new_oppo
+notify1         -> sound_notify1
+notify2         -> sound_notify2
+notify3_money   -> sound_notify3_money
+notify4         -> sound_notify4
+```
+
+Notlar:
+- iOS'ta seslerin çalması için dosyaların app bundle içinde bulunması gerekir. `NotificationSounds` klasörü Xcode projesine eklenmiş olmalıdır.
+- Android 8+ için kanallar bir kez oluşturulur; kullanıcı kanal ayarlarından sesi değiştirebilir.
+
 ## Kurulum
 
 ### 1. Bağımlılıklar

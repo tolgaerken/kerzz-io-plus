@@ -49,8 +49,16 @@
         {
           "icon": "./logos/ios/Icon-1024.png",
           "color": "#3B82F6",
-          "defaultChannel": "default",
-          "sounds": []
+          "defaultChannel": "fcm_default_channel",
+          "sounds": [
+            "./logos/sound/approve_request.mp3",
+            "./logos/sound/money.mp3",
+            "./logos/sound/new_oppo.mp3",
+            "./logos/sound/notify1.mp3",
+            "./logos/sound/notify2.mp3",
+            "./logos/sound/notify3-money.mp3",
+            "./logos/sound/notify4.mp3"
+          ]
         }
       ],
       [
