@@ -1,7 +1,26 @@
 import { Platform } from 'react-native';
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import { RN_CONFIG, SOCKET_CONFIG } from '../constants';
 import { SocketMongo } from '../types/mongo';
+
+// Platform-specific lazy loading
+let socketIOModule: any = null;
+const loadSocketIO = async () => {
+  if (socketIOModule) return socketIOModule;
+  
+  try {
+    if (Platform.OS === 'web') {
+      const module = await import('socket.io-client');
+      socketIOModule = module;
+    } else {
+      socketIOModule = require('socket.io-client');
+    }
+    return socketIOModule;
+  } catch (error) {
+    console.error('❌ socket.io-client yüklenemedi:', error);
+    throw error;
+  }
+};
 
 /**
  * Socket bağlantı durumu interface'i
@@ -81,7 +100,7 @@ export class SocketService {
   /**
    * Socket bağlantısını başlat
    */
-  public initialize(): void {
+  public async initialize(): Promise<void> {
     if (this.isInitialized) {
       return;
     }
@@ -89,6 +108,10 @@ export class SocketService {
     if (RN_CONFIG.ENABLE_LOGS) {
       console.log(`🔌 Socket service başlatılıyor... (${Platform.OS})`);
     }
+    
+    // Socket.io modülünü yükle
+    const socketModule = await loadSocketIO();
+    const io = socketModule.io;
     
     // React Native için optimize edilmiş socket konfigürasyonu
     const socketOptions = {

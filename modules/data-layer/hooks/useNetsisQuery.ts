@@ -18,7 +18,7 @@ import {
 import { useAuthStore } from '../../auth';
 
 // Netsis SQL servis URL'i - environment'tan al
-const NETSIS_SQL_URL = process.env.EXPO_PUBLIC_NETSIS_SQL_URL || 'https://public.kerzz.com:50504/api/sql';
+const NETSIS_SQL_URL = process.env.EXPO_PUBLIC_NETSIS_SQL_URL || 'https://socketio.kerzz.com:1443';
 
 /**
  * Netsis servisini al

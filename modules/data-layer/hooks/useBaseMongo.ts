@@ -540,7 +540,9 @@ export function useBaseMongo<T extends BaseModel>(
       }
       
       // Socket service'i başlat
-      socketService.initialize();
+      socketService.initialize().catch(error => {
+        console.error('Socket başlatma hatası:', error);
+      });
       
       // Unique service name oluştur (her hook instance için farklı)
       const serviceName = `useBaseMongo-${collection}-${Math.random().toString(36).substr(2, 9)}`;

@@ -115,6 +115,33 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="cari-borc-yas-test"
+          options={{
+            title: 'Borç Yaşlandırma',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="list.bullet.clipboard.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="netsis-example"
+          options={{
+            title: 'Netsis Örnek',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="server.rack" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="push-notification-logs"
+          options={{
+            title: 'Push Notification Logs',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="list.bullet.rectangle" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="sale-detail"
           options={{
             title: 'Satış Detayı',

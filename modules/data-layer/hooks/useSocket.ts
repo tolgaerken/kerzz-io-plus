@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { socketService, SocketState } from '../services/socketService';
 import { SocketMongo } from '../types/mongo';
 
@@ -65,7 +65,9 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
   // Auto connect
   useEffect(() => {
     if (autoConnect && !isInitializedRef.current) {
-      socketService.initialize();
+      socketService.initialize().catch(error => {
+        console.error('Socket başlatma hatası:', error);
+      });
       isInitializedRef.current = true;
     }
   }, [autoConnect]);
@@ -97,7 +99,9 @@ export function useSocket(options: UseSocketOptions = {}): UseSocketReturn {
 
   // Methods
   const connect = useCallback(() => {
-    socketService.initialize();
+    socketService.initialize().catch(error => {
+      console.error('Socket başlatma hatası:', error);
+    });
   }, []);
 
   const disconnect = useCallback(() => {

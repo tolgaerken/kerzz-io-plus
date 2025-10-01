@@ -5,14 +5,14 @@
  */
 
 import {
-  TErpBalanceList,
-  TNetsisAccount,
-  TNetsisBalance,
-  TNetsisDocumentDetail,
-  TNetsisInvoice,
-  TNetsisMuhPivot,
-  TNetsisStockBalance,
-  TNetsisTransaction,
+    TErpBalanceList,
+    TNetsisAccount,
+    TNetsisBalance,
+    TNetsisDocumentDetail,
+    TNetsisInvoice,
+    TNetsisMuhPivot,
+    TNetsisStockBalance,
+    TNetsisTransaction,
 } from '../types/netsis.types';
 
 /**
@@ -202,14 +202,17 @@ export class HttpSqlClient implements SqlServiceClient {
 
   async executeSql<T = any>(sql: string): Promise<T> {
     try {
-      const response = await fetch(this.baseUrl, {
+       
+        const url = this.baseUrl + '/sql/';
+        console.log('url:', url);
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(this.apiKey && { 'x-api-key': this.apiKey }),
           ...(this.token && { 'x-user-token': this.token }),
         },
-        body: JSON.stringify({ sql }),
+        body: JSON.stringify({action: 'sql', sql}),
       });
 
       if (!response.ok) {
