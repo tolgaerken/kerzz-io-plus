@@ -368,3 +368,31 @@ export interface TCounty {
   createdAt?: Date
   updatedAt?: Date
 }
+
+// Push Notification Log Types
+export interface TPushNotificationLog extends BaseModel {
+  _id?: {
+    $oid: string
+  }
+  // Her log bir kullanıcıya ait
+  userId: string; 
+  title: string;
+  message: string;
+  icon?: string;
+  sound?: string;
+  module: string;
+  action: string;
+  priority?: "high" | "normal";
+  fromUserId?: string;
+  deliveryMethod: "token" | "topic" | "broadcast";
+  userToken?: string;
+  fcmMessageId?: string;
+  deliveryStatus: "sent" | "failed";
+  errorMessage?: string;
+  fullDocument?: any;
+  customData?: any;
+  isRead?: boolean;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+  sentAt: Date;
+}

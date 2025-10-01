@@ -3,9 +3,9 @@ import * as Device from 'expo-device';
 import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import { isFirebaseInitialized } from '../../../config/firebase';
 import {
-    FCMToken,
-    NotificationPermission,
-    NotificationSettings
+  FCMToken,
+  NotificationPermission,
+  NotificationSettings
 } from '../types';
 
 // Debug data interface
@@ -180,7 +180,7 @@ class NotificationService {
           badge: true,
           sound: true,
           announcement: false,
-          carPlay: false,
+          carPlay: true,  // CarPlay bildirim desteği aktif
           criticalAlert: false,
           provisional: false,
         });
