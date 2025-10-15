@@ -15,7 +15,6 @@ config.resolver.sourceExts = [
 
 // Resolve aliases for missing modules  
 const { resolve } = require('metro-resolver');
-const path = require('path');
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   // Disable HMR and async-require on web to avoid compatibility issues

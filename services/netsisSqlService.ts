@@ -5,14 +5,14 @@
  */
 
 import {
-    TErpBalanceList,
-    TNetsisAccount,
-    TNetsisBalance,
-    TNetsisDocumentDetail,
-    TNetsisInvoice,
-    TNetsisMuhPivot,
-    TNetsisStockBalance,
-    TNetsisTransaction,
+  TErpBalanceList,
+  TNetsisAccount,
+  TNetsisBalance,
+  TNetsisDocumentDetail,
+  TNetsisInvoice,
+  TNetsisMuhPivot,
+  TNetsisStockBalance,
+  TNetsisTransaction,
 } from '../types/netsis.types';
 
 /**
@@ -130,8 +130,8 @@ export class NetsisSqlService {
   /**
    * Cari borç yaşlandırma raporu (Stored Procedure)
    */
-  async getCariBorcYas(company: string): Promise<TErpBalanceList[]> {
-    const sql = `EXECUTE NETSISSVR.${company}.dbo.SP_CARI_BORC_YAS`;
+  async getCariBorcYas(year: string | number, company: string): Promise<TErpBalanceList[]> {
+    const sql = `EXECUTE NETSISSVR.${company}${year}.dbo.SP_CARI_BORC_YAS`;
     console.log('SQL:', sql);
     return this.sqlClient.executeSql<TErpBalanceList[]>(sql);
   }

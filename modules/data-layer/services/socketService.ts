@@ -13,6 +13,7 @@ const loadSocketIO = async () => {
       const module = await import('socket.io-client');
       socketIOModule = module;
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       socketIOModule = require('socket.io-client');
     }
     return socketIOModule;
@@ -130,7 +131,9 @@ export class SocketService {
 
     this.setupSocketListeners();
     this.setupHeartbeat();
-    this.socket.connect();
+    if (this.socket) {
+      this.socket.connect();
+    }
     this.isInitialized = true;
   }
 

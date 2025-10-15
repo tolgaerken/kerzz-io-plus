@@ -8,8 +8,8 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 /**
  * Tek bir firma için borç yaşlandırma bilgisini gösteren component
  */
-function CompanyBalanceCard({ company }: { company: typeof OUR_COMPANIES[number] }) {
-  const { data, isLoading, error } = useNetsisCariBorcYas(company.cloudDb || '', {
+function CompanyBalanceCard({ company, year }: { company: typeof OUR_COMPANIES[number]; year: number }) {
+  const { data, isLoading, error } = useNetsisCariBorcYas(year, company.id, {
     enabled: !!company.cloudDb,
   });
 
@@ -101,7 +101,7 @@ function CompanyBalanceCard({ company }: { company: typeof OUR_COMPANIES[number]
         )}
       </View>
 
-      <ThemedText style={styles.success}>✅ Veriler console'da görüntülendi</ThemedText>
+      <ThemedText style={styles.success}>✅ Veriler console&apos;da görüntülendi</ThemedText>
     </ThemedView>
   );
 }
@@ -129,12 +129,12 @@ export default function CariBorcYasTestScreen() {
         </ThemedText>
         <ThemedText style={styles.year}>Yıl: {currentYear}</ThemedText>
         <ThemedText style={styles.info}>
-          💡 Veriler console'da detaylı olarak görüntülenmektedir
+          💡 Veriler console&apos;da detaylı olarak görüntülenmektedir
         </ThemedText>
       </ThemedView>
 
       {OUR_COMPANIES.map((company) => (
-        <CompanyBalanceCard key={company.id} company={company} />
+        <CompanyBalanceCard key={company.id} company={company} year={currentYear} />
       ))}
 
       <ThemedView style={styles.footer}>

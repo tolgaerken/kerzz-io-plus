@@ -31,9 +31,15 @@ interface NotificationDebugData {
 
 // Platform-specific imports
 let notificationFunctions: any = {};
+let notificationFunctionsLoaded = false;
 
 // Platform-specific Firebase functions will be loaded dynamically
 const loadFirebaseFunctions = async () => {
+  // Zaten yüklendiyse tekrar yükleme
+  if (notificationFunctionsLoaded) {
+    return;
+  }
+
   if (Platform.OS === 'web') {
     // Web için Firebase Web SDK
     try {
@@ -44,6 +50,7 @@ const loadFirebaseFunctions = async () => {
         onMessage: firebaseMessaging.onMessage,
         isSupported: firebaseMessaging.isSupported
       };
+      notificationFunctionsLoaded = true;
     } catch (error) {
       console.warn('⚠️ Firebase Web Messaging yüklenemedi:', error);
     }
@@ -67,14 +74,15 @@ const loadFirebaseFunctions = async () => {
         subscribeToTopic: firebaseMessaging.subscribeToTopic,
         unsubscribeFromTopic: firebaseMessaging.unsubscribeFromTopic
       };
+      notificationFunctionsLoaded = true;
     } catch (error) {
       console.warn('⚠️ React Native Firebase Messaging yüklenemedi:', error);
     }
   }
 };
 
-// Initialize functions
-loadFirebaseFunctions();
+// Initialize functions - artık module seviyesinde çağırmıyoruz
+// loadFirebaseFunctions();
 
 class NotificationService {
   private static instance: NotificationService;
@@ -92,6 +100,11 @@ class NotificationService {
   private readonly adminName = 'Tolga Erken';
 
   private constructor() {
+    // Firebase fonksiyonlarını yükle (async, ama constructor içinde await edemeyiz)
+    loadFirebaseFunctions().catch(error => {
+      console.error('❌ Firebase fonksiyonları yükleme hatası:', error);
+    });
+    
     this.initializeMessaging();
     // Test fonksiyonlarını setup et
     NotificationService.setupConsoleTest();
@@ -99,6 +112,9 @@ class NotificationService {
 
   private async initializeMessaging() {
     try {
+      // Firebase fonksiyonlarının yüklenmesini bekle
+      await loadFirebaseFunctions();
+      
       if (Platform.OS === 'web') {
         if (notificationFunctions.isSupported) {
           const supported = await notificationFunctions.isSupported();

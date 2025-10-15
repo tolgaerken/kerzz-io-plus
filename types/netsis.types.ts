@@ -58,15 +58,21 @@ export interface TNetsisDocumentDetail {
   TOPLAM: number;
 }
 
-// ERP Bakiye Listesi
+// ERP Bakiye Listesi (SP_CARI_BORC_YAS)
 export interface TErpBalanceList {
-  CARI_KOD: string;
-  CARI_ISIM: string;
-  VADE_0_30: number;
-  VADE_30_60: number;
-  VADE_60_90: number;
-  VADE_90_PLUS: number;
-  TOPLAM_BORC: number;
+  CariKodu: string;
+  CariUnvan: string;
+  CariBakiye: number;
+  ToplamGecikme: number;
+  VadesiGelmemis: number;
+  GECIKMEGUN: number;
+  CariVade: number;
+  Bugun: number;
+  VergiNo?: string;
+  TcKimlik?: string;
+  EkAcik1?: string;
+  GrupKodu?: string | null;
+  Limiti: number;
   [key: string]: any;
 }
 

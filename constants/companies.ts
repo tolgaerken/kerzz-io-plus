@@ -63,7 +63,7 @@ export const OUR_COMPANIES: readonly TOurCompany[] = [
     exemptionReason: '',
   },
   {
-    id: 'MARKAMUTFAGI',
+    id: 'MARKA',
     idc: 'markamutfagi',
     name: 'MARKA MUTFAĞI A.Ş.',
     cloudDb: '4165',

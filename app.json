@@ -4,7 +4,7 @@
     "slug": "kerzz-io-plus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./logos/ios/Icon-1024.png",
+    "icon": "./logos/logo/ios/AppIcon-1024x1024.png",
     "scheme": "kerzzioplus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,9 +16,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./logos/android/ic_launcher_192.png",
+        "foregroundImage": "./logos/logo/android/ic_launcher_192.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./logos/android/ic_launcher_192.png"
+        "monochromeImage": "./logos/logo/android/ic_launcher_192.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -27,7 +27,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./logos/ios/Icon-1024.png",
+      "favicon": "./logos/logo/ios/AppIcon-1024x1024.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -48,7 +48,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./logos/ios/Icon-1024.png",
+          "icon": "./logos/logo/ios/AppIcon-1024x1024.png",
           "color": "#3B82F6",
           "defaultChannel": "fcm_default_channel",
           "sounds": [
@@ -70,7 +70,7 @@
       ]
     ],
     "notification": {
-      "icon": "./logos/ios/Icon-1024.png",
+      "icon": "./logos/logo/ios/AppIcon-1024x1024.png",
       "color": "#3B82F6"
     },
     "experiments": {

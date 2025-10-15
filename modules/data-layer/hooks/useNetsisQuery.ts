@@ -7,13 +7,13 @@ import { useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query
 import { useCallback, useMemo } from 'react';
 import { createNetsisSqlService, NetsisSqlService } from '../../../services/netsisSqlService';
 import {
-  TErpBalanceList,
-  TNetsisAccount,
-  TNetsisDocumentDetail,
-  TNetsisInvoice,
-  TNetsisMuhPivot,
-  TNetsisStockBalance,
-  TNetsisTransaction,
+    TErpBalanceList,
+    TNetsisAccount,
+    TNetsisDocumentDetail,
+    TNetsisInvoice,
+    TNetsisMuhPivot,
+    TNetsisStockBalance,
+    TNetsisTransaction,
 } from '../../../types/netsis.types';
 import { useAuthStore } from '../../auth';
 
@@ -177,14 +177,15 @@ export function useNetsisDocumentDetail(
  * Cari borç yaşlandırma
  */
 export function useNetsisCariBorcYas(
+  year: string | number,
   company: string,
   options?: Omit<UseQueryOptions<TErpBalanceList[], Error>, 'queryKey' | 'queryFn'>
 ) {
   const service = useNetsisService();
 
   return useQuery({
-    queryKey: ['netsis', 'cari-borc-yas', company],
-    queryFn: () => service.getCariBorcYas(company),
+    queryKey: ['netsis', 'cari-borc-yas', year, company],
+    queryFn: () => service.getCariBorcYas(year, company),
     staleTime: 15 * 60 * 1000, // 15 dakika
     gcTime: 30 * 60 * 1000,
     ...options,

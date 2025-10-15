@@ -52,6 +52,15 @@ export default function DrawerLayout() {
           }}
         />
         <Drawer.Screen
+          name="offers"
+          options={{
+            title: 'Teklifler',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="doc.text.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
           name="opportunities"
           options={{
             title: 'Fırsatlar',
@@ -84,6 +93,15 @@ export default function DrawerLayout() {
             title: 'Banka İşlemleri',
             drawerIcon: ({ color, size }) => (
               <IconSymbol size={size} name="creditcard.fill" color={color} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="all-balances"
+          options={{
+            title: 'Tüm Bakiyeler',
+            drawerIcon: ({ color, size }) => (
+              <IconSymbol size={size} name="dollarsign.circle.fill" color={color} />
             ),
           }}
         />
@@ -166,6 +184,13 @@ export default function DrawerLayout() {
           name="bank-transaction-detail"
           options={{
             title: 'Banka İşlemi Detayı',
+            drawerItemStyle: { display: 'none' }, // Hide from drawer menu
+          }}
+        />
+        <Drawer.Screen
+          name="offer-detail"
+          options={{
+            title: 'Teklif Detayı',
             drawerItemStyle: { display: 'none' }, // Hide from drawer menu
           }}
         />
